@@ -35,6 +35,23 @@ export function PostbackDetailPage() {
 
   const network = query.data;
 
+  // Build an example URL the user can copy into the network's dashboard.
+  // LHS param names are FIXED canonical names; RHS is the network's macro
+  // (taken from the mapping). The network substitutes {<macro>} before firing,
+  // so the backend always receives the fixed canonical names.
+  const exampleParts: string[] = [];
+  if (network.mapping_click_id)  exampleParts.push(`click_id={${network.mapping_click_id}}`);
+  if (network.mapping_payout)    exampleParts.push(`payout={${network.mapping_payout}}`);
+  if (network.mapping_currency)  exampleParts.push(`currency={${network.mapping_currency}}`);
+  if (network.mapping_status)    exampleParts.push(`status={${network.mapping_status}}`);
+  if (network.mapping_txn_id)    exampleParts.push(`transaction_id={${network.mapping_txn_id}}`);
+  if (network.mapping_timestamp) exampleParts.push(`event_time={${network.mapping_timestamp}}`);
+  const extraEntries = Object.entries(network.extra_mappings ?? {});
+  for (const [paramName, macro] of extraEntries) {
+    if (macro) exampleParts.push(`${paramName}={${macro}}`);
+  }
+  const exampleUrl = `${network.postback_url ?? ''}${exampleParts.length ? '?' + exampleParts.join('&') : ''}`;
+
   const mappingRows: { key: string; label: string; value?: string }[] = [
     { key: 'mapping_click_id',  label: 'Click ID',         value: network.mapping_click_id },
     { key: 'mapping_payout',    label: 'Payout',           value: network.mapping_payout },
@@ -42,6 +59,11 @@ export function PostbackDetailPage() {
     { key: 'mapping_status',    label: 'Status',           value: network.mapping_status },
     { key: 'mapping_txn_id',    label: 'Transaction ID',   value: network.mapping_txn_id },
     { key: 'mapping_timestamp', label: 'Event timestamp',  value: network.mapping_timestamp },
+    ...extraEntries.map(([paramName, macro]) => ({
+      key: `extra_${paramName}`,
+      label: paramName,
+      value: macro,
+    })),
   ];
 
   return (
@@ -65,15 +87,37 @@ export function PostbackDetailPage() {
         <Card className="lg:col-span-2">
           <CardHeader title="Postback URL" subtitle="Configure this URL in your network's dashboard. They append their parameters to it." />
           <CardBody className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Input readOnly value={network.postback_url ?? ''} className="font-mono text-xs" />
-              {network.postback_url && <CopyButton value={network.postback_url} />}
+            <div>
+              <label className="label">Base URL</label>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={network.postback_url ?? ''} className="font-mono text-xs" />
+                {network.postback_url && <CopyButton value={network.postback_url} />}
+              </div>
             </div>
+
+            <div>
+              <label className="label">Example URL with your mapped parameters</label>
+              <div className="flex items-start gap-2">
+                <code className="flex-1 break-all rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">
+                  {exampleUrl}
+                </code>
+                <CopyButton value={exampleUrl} />
+              </div>
+              <p className="hint">
+                Paste this into the network's postback field as-is. The parameter names on the left
+                (<code className="rounded bg-slate-100 px-1 py-0.5 font-mono">click_id</code>,{' '}
+                <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">payout</code>, …) are fixed — the network
+                substitutes each <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">{'{macro}'}</code>{' '}
+                with the actual value before firing.
+              </p>
+            </div>
+
             <p className="text-xs text-slate-500">
-              The backend reads the network's parameter mapping to extract canonical fields, looks up the
+              On every fire, the backend extracts the mapped fields, looks up
               <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 font-mono">click_id</code>
-              against your click log, and stores a conversion with <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 font-mono">verified: true</code>
-              if found, or <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 font-mono">false</code> otherwise.
+              against your click log, and stores a conversion with{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">verified: true</code> if found,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">false</code> otherwise.
             </p>
           </CardBody>
         </Card>
@@ -89,7 +133,7 @@ export function PostbackDetailPage() {
         </Card>
 
         <Card className="lg:col-span-3">
-          <CardHeader title="Parameter mapping" subtitle="The incoming parameter name the network sends for each canonical field." />
+          <CardHeader title="Parameter mapping" subtitle="The macro name this network substitutes for each URL parameter." />
           <CardBody>
             <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-3">
               {mappingRows.map((m) => (

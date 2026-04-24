@@ -21,6 +21,7 @@ export interface Network {
   mapping_status?: string;
   mapping_txn_id?: string;
   mapping_timestamp?: string;
+  extra_mappings?: Record<string, string>;
   default_status?: string;
   created_at?: string;
   updated_at?: string;

@@ -1,5 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, X } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +17,18 @@ interface Props {
 }
 
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,63}$/;
+const CANONICAL_RE = /^[a-z][a-z0-9_]{0,31}$/;
+
+// Canonical names used by the built-in fields. Extra mappings cannot collide.
+const RESERVED_CANONICALS = new Set([
+  'click_id', 'payout', 'currency', 'status', 'transaction_id', 'event_time',
+]);
+
+interface ExtraRow {
+  id: string;
+  canonical: string;
+  param: string;
+}
 
 interface FormState {
   network_id: string;
@@ -28,13 +41,28 @@ interface FormState {
   mapping_txn_id: string;
   mapping_timestamp: string;
   default_status: string;
+  extras: ExtraRow[];
 }
 
 const empty: FormState = {
   network_id: '', name: '', status: 'active',
   mapping_click_id: 'click_id', mapping_payout: '', mapping_currency: '',
   mapping_status: '', mapping_txn_id: '', mapping_timestamp: '', default_status: 'approved',
+  extras: [],
 };
+
+function extrasFromNetwork(n?: Network | null): ExtraRow[] {
+  if (!n?.extra_mappings) return [];
+  return Object.entries(n.extra_mappings).map(([canonical, param], i) => ({
+    id: `init-${i}`,
+    canonical,
+    param,
+  }));
+}
+
+function genRowId(): string {
+  return `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export function PostbackFormModal({ open, onClose, initial }: Props) {
   const editing = !!initial;
@@ -59,6 +87,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
         mapping_txn_id: initial.mapping_txn_id ?? '',
         mapping_timestamp: initial.mapping_timestamp ?? '',
         default_status: initial.default_status ?? 'approved',
+        extras: extrasFromNetwork(initial),
       });
     } else {
       setForm(empty);
@@ -68,8 +97,52 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
   const update = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const addExtra = () =>
+    setForm((f) => ({ ...f, extras: [...f.extras, { id: genRowId(), canonical: '', param: '' }] }));
+
+  const removeExtra = (id: string) =>
+    setForm((f) => ({ ...f, extras: f.extras.filter((r) => r.id !== id) }));
+
+  const updateExtra = (id: string, patch: Partial<Omit<ExtraRow, 'id'>>) =>
+    setForm((f) => ({
+      ...f,
+      extras: f.extras.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+
+  const validateExtras = (): { ok: true; value: Record<string, string> } | { ok: false; reason: string } => {
+    const out: Record<string, string> = {};
+    const seenParams = new Set<string>();
+    for (const row of form.extras) {
+      const canonical = row.canonical.trim().toLowerCase();
+      const param = row.param.trim();
+      if (!canonical && !param) continue; // allow empty trailing rows
+      if (!canonical || !param) {
+        return { ok: false, reason: 'Each custom field needs both a canonical name and a parameter name.' };
+      }
+      if (!CANONICAL_RE.test(canonical)) {
+        return { ok: false, reason: `Invalid canonical name "${canonical}": lowercase letters, digits, underscore; must start with a letter.` };
+      }
+      if (RESERVED_CANONICALS.has(canonical)) {
+        return { ok: false, reason: `"${canonical}" is reserved — it's already a built-in field.` };
+      }
+      if (canonical in out) {
+        return { ok: false, reason: `Duplicate canonical name "${canonical}".` };
+      }
+      const paramLower = param.toLowerCase();
+      if (seenParams.has(paramLower)) {
+        return { ok: false, reason: `Duplicate parameter name "${param}".` };
+      }
+      seenParams.add(paramLower);
+      out[canonical] = param;
+    }
+    return { ok: true, value: out };
+  };
+
   const mutation = useMutation({
     mutationFn: () => {
+      const extras = validateExtras();
+      if (!extras.ok) throw new Error(extras.reason);
+
       const payload = {
         name: form.name.trim(),
         status: form.status,
@@ -80,6 +153,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
         mapping_txn_id: form.mapping_txn_id.trim() || undefined,
         mapping_timestamp: form.mapping_timestamp.trim() || undefined,
         default_status: form.default_status.trim() || undefined,
+        extra_mappings: extras.value,
       };
       if (editing) return networksApi.update(initial!.network_id, payload);
       if (!SLUG_RE.test(form.network_id)) {
@@ -105,6 +179,15 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
     setError(null);
     mutation.mutate();
   }
+
+  const extraCanonicalConflicts = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of form.extras) {
+      const c = r.canonical.trim().toLowerCase();
+      if (c && RESERVED_CANONICALS.has(c)) s.add(r.id);
+    }
+    return s;
+  }, [form.extras]);
 
   return (
     <Modal
@@ -168,8 +251,11 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
           <div className="rounded-md bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
             <h3 className="text-sm font-semibold text-slate-900">Parameter mapping</h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              Each value is the parameter name the network will <em>actually send</em>. The backend uses these to
-              extract the canonical fields.
+              Each value is the <em>macro</em> this network uses for that field — e.g. Kelkoo{' '}
+              <code className="rounded bg-white px-1 py-0.5 font-mono">ClickId</code>, TUNE{' '}
+              <code className="rounded bg-white px-1 py-0.5 font-mono">aff_sub</code>. URL parameter names
+              (<code className="rounded bg-white px-1 py-0.5 font-mono">click_id</code>,{' '}
+              <code className="rounded bg-white px-1 py-0.5 font-mono">payout</code>, …) stay fixed.
             </p>
             <div className="mt-3 grid grid-cols-2 gap-4">
               <Field label="Click ID *" value={form.mapping_click_id} onChange={update('mapping_click_id')} placeholder="cid" required />
@@ -186,6 +272,63 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
                 onChange={update('default_status')}
                 placeholder="approved"
               />
+            </div>
+
+            <div className="mt-5 border-t border-slate-200 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">Custom fields</h4>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Extra URL parameters. Left is the parameter name that appears in the URL;
+                    right is the macro the network substitutes.
+                  </p>
+                </div>
+                <Button type="button" variant="secondary" onClick={addExtra}>
+                  <Plus className="h-4 w-4" /> Add field
+                </Button>
+              </div>
+
+              {form.extras.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {form.extras.map((row) => {
+                    const conflict = extraCanonicalConflicts.has(row.id);
+                    return (
+                      <div key={row.id} className="grid grid-cols-[1fr_1fr_auto] items-start gap-2">
+                        <div>
+                          <Input
+                            value={row.canonical}
+                            onChange={(e) => updateExtra(row.id, { canonical: e.target.value })}
+                            placeholder="sub1"
+                            aria-label="URL parameter name"
+                          />
+                          {conflict && (
+                            <p className="mt-1 text-xs text-red-600">Reserved — built-in field.</p>
+                          )}
+                        </div>
+                        <Input
+                          value={row.param}
+                          onChange={(e) => updateExtra(row.id, { param: e.target.value })}
+                          placeholder="aff_sub1"
+                          aria-label="Network macro"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeExtra(row.id)}
+                          className="mt-1.5 inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          aria-label="Remove custom field"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-0.5 text-[11px] uppercase tracking-wide text-slate-400">
+                    <span>URL parameter</span>
+                    <span>Network macro</span>
+                    <span className="w-8" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

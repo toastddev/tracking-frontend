@@ -52,7 +52,10 @@ export function OfferDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader title="Tracking URL" subtitle="Share this with affiliates. They append aff_id and any sub params." />
+          <CardHeader
+            title="Tracking URL"
+            subtitle="Give this to each affiliate after replacing YOUR_AFFILIATE_ID with their ID. aff_id is required."
+          />
           <CardBody className="space-y-4">
             <div className="flex items-center gap-2">
               <code className="flex-1 truncate rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">
@@ -60,6 +63,14 @@ export function OfferDetailPage() {
               </code>
               {offer.tracking_url && <CopyButton value={offer.tracking_url} />}
             </div>
+            <p className="text-xs text-slate-500">
+              Affiliates can also append <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">&amp;s1=…&amp;s2=…</code>{' '}
+              sub-parameters and ad-platform IDs (<code className="rounded bg-slate-100 px-1 py-0.5 font-mono">gclid</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">gbraid</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">fbclid</code>, etc.) — they're captured on the
+              click and available as <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">{'{token}'}</code> in the
+              affiliate destination template below.
+            </p>
 
             <div>
               <div className="label">Affiliate destination template</div>
