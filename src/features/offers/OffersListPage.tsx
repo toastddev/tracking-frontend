@@ -49,9 +49,9 @@ export function OffersListPage() {
       />
 
       <Card>
-        <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="flex flex-col gap-2 border-b border-slate-200 px-3 py-3 sm:flex-row sm:items-center sm:px-4 dark:border-neutral-800">
+          <div className="relative flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-neutral-500" />
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -60,21 +60,23 @@ export function OffersListPage() {
               className="pl-8"
             />
           </div>
-          <Button variant="secondary" size="sm" onClick={applySearch}>Search</Button>
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setQ('');
-                setSearchTerm('');
-                setCursorStack([null]);
-              }}
-            >
-              Clear
-            </Button>
-          )}
-          {query.isFetching && <Spinner className="ml-2 text-slate-400" />}
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={applySearch}>Search</Button>
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setQ('');
+                  setSearchTerm('');
+                  setCursorStack([null]);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+            {query.isFetching && <Spinner className="ml-auto text-slate-400 dark:text-neutral-500" />}
+          </div>
         </div>
 
         {query.isLoading ? (
@@ -94,52 +96,90 @@ export function OffersListPage() {
           />
         ) : (
           <>
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Name</TH>
-                  <TH>Status</TH>
-                  <TH>Tracking URL</TH>
-                  <TH>Created</TH>
-                  <TH className="text-right">Actions</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {query.data?.items.map((offer) => (
-                  <TR key={offer.offer_id}>
-                    <TD>
+            {/* Mobile card list */}
+            <ul className="divide-y divide-slate-100 sm:hidden dark:divide-neutral-800">
+              {query.data?.items.map((offer) => (
+                <li key={offer.offer_id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <Link
                         to={`/offers/${encodeURIComponent(offer.offer_id)}`}
-                        className="font-medium text-slate-900 hover:text-brand-600"
+                        className="block truncate font-medium text-slate-900 dark:text-neutral-100"
                       >
                         {offer.name}
                       </Link>
-                      <div className="text-xs text-slate-500">{offer.offer_id}</div>
-                    </TD>
-                    <TD>
-                      <Badge tone={offer.status === 'active' ? 'green' : 'gray'}>{offer.status}</Badge>
-                    </TD>
-                    <TD>
-                      <div className="flex items-center gap-2">
-                        <code className="truncate font-mono text-xs text-slate-600 max-w-[280px]">
-                          {offer.tracking_url}
-                        </code>
-                        {offer.tracking_url && <CopyButton value={offer.tracking_url} />}
-                      </div>
-                    </TD>
-                    <TD className="text-xs text-slate-500">{fmtRelative(offer.created_at)}</TD>
-                    <TD className="text-right">
-                      <Link
-                        to={`/offers/${encodeURIComponent(offer.offer_id)}`}
-                        className="text-sm font-medium text-brand-600 hover:underline"
-                      >
-                        Open →
-                      </Link>
-                    </TD>
+                      <div className="truncate text-xs text-slate-500 dark:text-neutral-400">{offer.offer_id}</div>
+                    </div>
+                    <Badge tone={offer.status === 'active' ? 'green' : 'gray'}>{offer.status}</Badge>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <code className="min-w-0 flex-1 truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
+                      {offer.tracking_url}
+                    </code>
+                    {offer.tracking_url && <CopyButton value={offer.tracking_url} />}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
+                    <span>{fmtRelative(offer.created_at)}</span>
+                    <Link
+                      to={`/offers/${encodeURIComponent(offer.offer_id)}`}
+                      className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                    >
+                      Open →
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block">
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Name</TH>
+                    <TH>Status</TH>
+                    <TH>Tracking URL</TH>
+                    <TH>Created</TH>
+                    <TH className="text-right">Actions</TH>
                   </TR>
-                ))}
-              </TBody>
-            </Table>
+                </THead>
+                <TBody>
+                  {query.data?.items.map((offer) => (
+                    <TR key={offer.offer_id} className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50">
+                      <TD>
+                        <Link
+                          to={`/offers/${encodeURIComponent(offer.offer_id)}`}
+                          className="font-medium text-slate-900 hover:text-brand-600 dark:text-neutral-100 dark:hover:text-brand-400"
+                        >
+                          {offer.name}
+                        </Link>
+                        <div className="text-xs text-slate-500 dark:text-neutral-400">{offer.offer_id}</div>
+                      </TD>
+                      <TD>
+                        <Badge tone={offer.status === 'active' ? 'green' : 'gray'}>{offer.status}</Badge>
+                      </TD>
+                      <TD>
+                        <div className="flex items-center gap-2">
+                          <code className="max-w-[280px] truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
+                            {offer.tracking_url}
+                          </code>
+                          {offer.tracking_url && <CopyButton value={offer.tracking_url} />}
+                        </div>
+                      </TD>
+                      <TD className="text-xs text-slate-500 dark:text-neutral-400">{fmtRelative(offer.created_at)}</TD>
+                      <TD className="text-right">
+                        <Link
+                          to={`/offers/${encodeURIComponent(offer.offer_id)}`}
+                          className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+                        >
+                          Open →
+                        </Link>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </div>
             <Pagination
               hasPrev={cursorStack.length > 1}
               hasNext={!!query.data?.nextCursor}

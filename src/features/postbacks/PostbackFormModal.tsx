@@ -210,20 +210,20 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
     >
       {created ? (
         <div className="space-y-4">
-          <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-100">
+          <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/30">
             Postback created. Configure this URL in your network's dashboard.
           </div>
           <div>
             <label className="label">Postback URL</label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input readOnly value={created.postback_url ?? ''} className="font-mono text-xs" />
-              <CopyButton value={created.postback_url ?? ''} />
+              <CopyButton value={created.postback_url ?? ''} className="self-start sm:self-auto" />
             </div>
           </div>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="label">Network ID (slug)</label>
               <Input
@@ -248,16 +248,16 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
             <Input value={form.name} onChange={update('name')} placeholder="Kelkoo" required />
           </div>
 
-          <div className="rounded-md bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
-            <h3 className="text-sm font-semibold text-slate-900">Parameter mapping</h3>
-            <p className="mt-0.5 text-xs text-slate-500">
+          <div className="rounded-md bg-slate-50 px-4 py-3 ring-1 ring-slate-200 dark:bg-neutral-950/60 dark:ring-neutral-800">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-neutral-100">Parameter mapping</h3>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-400">
               Each value is the <em>macro</em> this network uses for that field — e.g. Kelkoo{' '}
-              <code className="rounded bg-white px-1 py-0.5 font-mono">ClickId</code>, TUNE{' '}
-              <code className="rounded bg-white px-1 py-0.5 font-mono">aff_sub</code>. URL parameter names
-              (<code className="rounded bg-white px-1 py-0.5 font-mono">click_id</code>,{' '}
-              <code className="rounded bg-white px-1 py-0.5 font-mono">payout</code>, …) stay fixed.
+              <code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">ClickId</code>, TUNE{' '}
+              <code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">aff_sub</code>. URL parameter names
+              (<code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">click_id</code>,{' '}
+              <code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">payout</code>, …) stay fixed.
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-4">
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Click ID *" value={form.mapping_click_id} onChange={update('mapping_click_id')} placeholder="cid" required />
               <Field label="Payout" value={form.mapping_payout} onChange={update('mapping_payout')} placeholder="revenue" />
               <Field label="Currency" value={form.mapping_currency} onChange={update('mapping_currency')} placeholder="currency" />
@@ -274,16 +274,16 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
               />
             </div>
 
-            <div className="mt-5 border-t border-slate-200 pt-4">
-              <div className="flex items-center justify-between">
+            <div className="mt-5 border-t border-slate-200 pt-4 dark:border-neutral-800">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-900">Custom fields</h4>
-                  <p className="mt-0.5 text-xs text-slate-500">
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-neutral-100">Custom fields</h4>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-400">
                     Extra URL parameters. Left is the parameter name that appears in the URL;
                     right is the macro the network substitutes.
                   </p>
                 </div>
-                <Button type="button" variant="secondary" onClick={addExtra}>
+                <Button type="button" variant="secondary" size="sm" onClick={addExtra}>
                   <Plus className="h-4 w-4" /> Add field
                 </Button>
               </div>
@@ -302,7 +302,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
                             aria-label="URL parameter name"
                           />
                           {conflict && (
-                            <p className="mt-1 text-xs text-red-600">Reserved — built-in field.</p>
+                            <p className="mt-1 text-xs text-red-600 dark:text-red-400">Reserved — built-in field.</p>
                           )}
                         </div>
                         <Input
@@ -314,7 +314,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
                         <button
                           type="button"
                           onClick={() => removeExtra(row.id)}
-                          className="mt-1.5 inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                          className="mt-1.5 inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                           aria-label="Remove custom field"
                         >
                           <X className="h-4 w-4" />
@@ -322,7 +322,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
                       </div>
                     );
                   })}
-                  <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-0.5 text-[11px] uppercase tracking-wide text-slate-400">
+                  <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-0.5 text-[11px] uppercase tracking-wide text-slate-400 dark:text-neutral-500">
                     <span>URL parameter</span>
                     <span>Network macro</span>
                     <span className="w-8" />
@@ -333,7 +333,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+            <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
               {error}
             </div>
           )}

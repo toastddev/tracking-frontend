@@ -28,7 +28,7 @@ export function PostbackDetailPage() {
   if (query.isError || !query.data) {
     return (
       <Card>
-        <div className="px-5 py-4 text-sm text-slate-600">Postback not found.</div>
+        <div className="px-5 py-4 text-sm text-slate-600 dark:text-neutral-300">Postback not found.</div>
       </Card>
     );
   }
@@ -70,7 +70,10 @@ export function PostbackDetailPage() {
     <>
       <PageHeader
         back={
-          <Link to="/postbacks" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+          <Link
+            to="/postbacks"
+            className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+          >
             <ArrowLeft className="h-4 w-4" /> All postbacks
           </Link>
         }
@@ -89,35 +92,31 @@ export function PostbackDetailPage() {
           <CardBody className="space-y-4">
             <div>
               <label className="label">Base URL</label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input readOnly value={network.postback_url ?? ''} className="font-mono text-xs" />
-                {network.postback_url && <CopyButton value={network.postback_url} />}
+                {network.postback_url && <CopyButton value={network.postback_url} className="self-start sm:self-auto" />}
               </div>
             </div>
 
             <div>
               <label className="label">Example URL with your mapped parameters</label>
-              <div className="flex items-start gap-2">
-                <code className="flex-1 break-all rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <code className="flex-1 break-all rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200 dark:bg-neutral-950/60 dark:text-neutral-300 dark:ring-neutral-800">
                   {exampleUrl}
                 </code>
-                <CopyButton value={exampleUrl} />
+                <CopyButton value={exampleUrl} className="self-start sm:self-auto" />
               </div>
               <p className="hint">
                 Paste this into the network's postback field as-is. The parameter names on the left
-                (<code className="rounded bg-slate-100 px-1 py-0.5 font-mono">click_id</code>,{' '}
-                <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">payout</code>, …) are fixed — the network
-                substitutes each <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">{'{macro}'}</code>{' '}
-                with the actual value before firing.
+                (<Tok>click_id</Tok>, <Tok>payout</Tok>, …) are fixed — the network substitutes each{' '}
+                <Tok>{'{macro}'}</Tok> with the actual value before firing.
               </p>
             </div>
 
-            <p className="text-xs text-slate-500">
-              On every fire, the backend extracts the mapped fields, looks up
-              <code className="mx-1 rounded bg-slate-100 px-1 py-0.5 font-mono">click_id</code>
-              against your click log, and stores a conversion with{' '}
-              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">verified: true</code> if found,{' '}
-              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">false</code> otherwise.
+            <p className="text-xs text-slate-500 dark:text-neutral-400">
+              On every fire, the backend extracts the mapped fields, looks up <Tok>click_id</Tok>{' '}
+              against your click log, and stores a conversion with <Tok>verified: true</Tok> if found,{' '}
+              <Tok>false</Tok> otherwise.
             </p>
           </CardBody>
         </Card>
@@ -135,11 +134,14 @@ export function PostbackDetailPage() {
         <Card className="lg:col-span-3">
           <CardHeader title="Parameter mapping" subtitle="The macro name this network substitutes for each URL parameter." />
           <CardBody>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 md:grid-cols-3">
               {mappingRows.map((m) => (
-                <div key={m.key} className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-                  <span className="text-xs uppercase tracking-wide text-slate-500">{m.label}</span>
-                  <code className="font-mono text-xs text-slate-700">{m.value || '—'}</code>
+                <div
+                  key={m.key}
+                  className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2 dark:border-neutral-800"
+                >
+                  <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-neutral-400">{m.label}</span>
+                  <code className="font-mono text-xs text-slate-700 dark:text-neutral-300">{m.value || '—'}</code>
                 </div>
               ))}
             </div>
@@ -160,8 +162,16 @@ export function PostbackDetailPage() {
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs uppercase tracking-wide text-slate-500">{label}</span>
-      <span className="text-slate-700">{value}</span>
+      <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-neutral-400">{label}</span>
+      <span className="text-slate-700 dark:text-neutral-200">{value}</span>
     </div>
+  );
+}
+
+function Tok({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">
+      {children}
+    </code>
   );
 }

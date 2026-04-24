@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { auth } from '@/lib/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 interface LoginResponse {
   token: string;
@@ -42,14 +43,17 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-7 shadow-card">
+    <div className="relative flex min-h-screen items-center justify-center bg-slate-50 p-4 dark:bg-neutral-950">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle variant="compact" />
+      </div>
+      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-7 shadow-card dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-card-dark">
         <div className="mb-6 flex items-center gap-2">
           <LayoutDashboard className="h-5 w-5 text-brand-600" />
-          <span className="text-sm font-semibold text-slate-900">Tracking · Admin</span>
+          <span className="text-sm font-semibold text-slate-900 dark:text-neutral-100">Tracking · Admin</span>
         </div>
-        <h1 className="text-xl font-semibold text-slate-900">Sign in</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-neutral-100">Sign in</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">
           Use the admin credentials configured on the tracking backend.
         </p>
 
@@ -78,7 +82,7 @@ export function LoginPage() {
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+            <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
               {error}
             </div>
           )}

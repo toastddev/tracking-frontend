@@ -48,8 +48,8 @@ export function EventLog({ networkId }: Props) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 px-4 py-3">
-        <div>
+      <div className="flex flex-wrap items-end gap-3 border-b border-slate-200 px-4 py-3 dark:border-neutral-800">
+        <div className="min-w-[9rem] flex-1 sm:flex-none">
           <label className="label">Verified</label>
           <Select
             value={verifiedFilter}
@@ -63,7 +63,7 @@ export function EventLog({ networkId }: Props) {
             <option value="unverified">Unverified only</option>
           </Select>
         </div>
-        <div>
+        <div className="min-w-[12rem] flex-1 sm:flex-none">
           <label className="label">From</label>
           <Input
             type="datetime-local"
@@ -71,7 +71,7 @@ export function EventLog({ networkId }: Props) {
             onChange={(e) => { setFrom(e.target.value); resetPagination(); }}
           />
         </div>
-        <div>
+        <div className="min-w-[12rem] flex-1 sm:flex-none">
           <label className="label">To</label>
           <Input
             type="datetime-local"
@@ -79,7 +79,7 @@ export function EventLog({ networkId }: Props) {
             onChange={(e) => { setTo(e.target.value); resetPagination(); }}
           />
         </div>
-        {query.isFetching && <Spinner className="ml-auto text-slate-400" />}
+        {query.isFetching && <Spinner className="ml-auto text-slate-400 dark:text-neutral-500" />}
       </div>
 
       {query.isLoading ? (
@@ -108,17 +108,17 @@ export function EventLog({ networkId }: Props) {
               {query.data?.items.map((c) => (
                 <TR
                   key={c.conversion_id}
-                  className="cursor-pointer hover:bg-slate-50"
+                  className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-neutral-800/50"
                   onClick={() => setOpenConversionId(c.conversion_id)}
                 >
-                  <TD className="whitespace-nowrap text-xs text-slate-600">{fmtDateTime(c.created_at)}</TD>
+                  <TD className="whitespace-nowrap text-xs text-slate-600 dark:text-neutral-400">{fmtDateTime(c.created_at)}</TD>
                   <TD>
-                    <code className="font-mono text-xs text-slate-700">{shortId(c.click_id, 12)}</code>
+                    <code className="font-mono text-xs text-slate-700 dark:text-neutral-300">{shortId(c.click_id, 12)}</code>
                   </TD>
                   <TD>
                     <span className="text-sm">{c.status ?? '—'}</span>
                   </TD>
-                  <TD className="font-medium text-slate-900">{fmtMoney(c.payout, c.currency)}</TD>
+                  <TD className="font-medium text-slate-900 dark:text-neutral-100">{fmtMoney(c.payout, c.currency)}</TD>
                   <TD>
                     {c.verified ? (
                       <Badge tone="green">verified</Badge>
@@ -126,9 +126,9 @@ export function EventLog({ networkId }: Props) {
                       <Badge tone="amber">unverified</Badge>
                     )}
                   </TD>
-                  <TD className="text-xs text-slate-500">{c.method}</TD>
+                  <TD className="text-xs text-slate-500 dark:text-neutral-400">{c.method}</TD>
                   <TD className="text-right">
-                    <span className="text-sm font-medium text-brand-600">View →</span>
+                    <span className="text-sm font-medium text-brand-600 dark:text-brand-400">View →</span>
                   </TD>
                 </TR>
               ))}

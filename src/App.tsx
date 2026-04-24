@@ -6,6 +6,7 @@ import { OffersListPage } from '@/features/offers/OffersListPage';
 import { OfferDetailPage } from '@/features/offers/OfferDetailPage';
 import { PostbacksListPage } from '@/features/postbacks/PostbacksListPage';
 import { PostbackDetailPage } from '@/features/postbacks/PostbackDetailPage';
+import { ReportsPage } from '@/features/reports/ReportsPage';
 
 export default function App() {
   return (
@@ -19,14 +20,15 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="/offers" replace />} />
+        <Route index element={<Navigate to="/reports" replace />} />
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/offers" element={<OffersListPage />} />
         <Route path="/offers/:id" element={<OfferDetailPage />} />
         <Route path="/postbacks" element={<PostbacksListPage />} />
         <Route path="/postbacks/:id" element={<PostbackDetailPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/offers" replace />} />
+      <Route path="*" element={<Navigate to="/reports" replace />} />
     </Routes>
   );
 }

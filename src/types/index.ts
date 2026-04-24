@@ -76,3 +76,23 @@ export interface Page<T> {
   items: T[];
   nextCursor: string | null;
 }
+
+export interface ReportSummary {
+  from: string;
+  to: string;
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  unverified: number;
+  revenue: number;
+  cvr: number;
+  epc: number;
+}
+
+export interface TimeseriesPoint {
+  date: string;
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  revenue: number;
+}

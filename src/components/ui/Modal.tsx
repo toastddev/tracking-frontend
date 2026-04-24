@@ -28,29 +28,34 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: P
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-900/50 p-0 backdrop-blur-sm animate-fade-in sm:items-start sm:p-4 dark:bg-neutral-950/70"
+      onClick={onClose}
+    >
       <div
         className={cn(
-          'mt-16 w-full rounded-xl bg-white shadow-xl ring-1 ring-slate-900/5',
+          'w-full rounded-t-2xl bg-white shadow-xl ring-1 ring-slate-900/5 animate-scale-in',
+          'sm:mt-16 sm:rounded-xl',
+          'dark:bg-neutral-900 dark:ring-neutral-700/50',
           sizes[size]
         )}
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3.5 sm:px-5 dark:border-neutral-800">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-neutral-100">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="px-4 py-4 sm:px-5">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-2 rounded-b-xl border-t border-slate-200 bg-slate-50 px-5 py-3">
+          <div className="flex flex-col-reverse items-stretch gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:rounded-b-xl sm:px-5 dark:border-neutral-800 dark:bg-neutral-950/50">
             {footer}
           </div>
         )}

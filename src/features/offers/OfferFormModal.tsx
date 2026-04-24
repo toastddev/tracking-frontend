@@ -108,14 +108,14 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
     >
       {created ? (
         <div className="space-y-4">
-          <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-100">
+          <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/30">
             Offer created. Replace <code>YOUR_AFFILIATE_ID</code> with the affiliate's ID before sharing.
           </div>
           <div>
             <label className="label">Tracking URL</label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input readOnly value={created.tracking_url ?? ''} className="font-mono text-xs" />
-              <CopyButton value={created.tracking_url ?? ''} />
+              <CopyButton value={created.tracking_url ?? ''} className="self-start sm:self-auto" />
             </div>
             <p className="hint">
               <code>aff_id</code> is required. Affiliates can also append <code>&amp;s1=…&amp;gclid=…</code> sub-params and ad-platform IDs.
@@ -124,7 +124,7 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="label" htmlFor="offer_id">Offer ID</label>
               <Input
@@ -175,7 +175,7 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100">
+            <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
               {error}
             </div>
           )}

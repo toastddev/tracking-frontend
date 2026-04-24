@@ -7,7 +7,7 @@ export function Spinner({ className }: { className?: string }) {
 
 export function CenteredSpinner() {
   return (
-    <div className="flex items-center justify-center py-12 text-slate-400">
+    <div className="flex items-center justify-center py-12 text-slate-400 dark:text-neutral-600">
       <Spinner className="h-6 w-6" />
     </div>
   );

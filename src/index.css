@@ -9,8 +9,21 @@
     text-rendering: optimizeLegibility;
   }
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply bg-slate-50 text-slate-900 transition-colors duration-150;
   }
+  html.dark body {
+    @apply bg-black text-neutral-100;
+  }
+  /* Nicer native form controls in both themes. */
+  html.dark input[type='datetime-local'],
+  html.dark input[type='date'],
+  html.dark input[type='time'] {
+    color-scheme: dark;
+  }
+  /* Scrollbar polish */
+  html.dark ::-webkit-scrollbar { background: theme('colors.neutral.900'); }
+  html.dark ::-webkit-scrollbar-thumb { background: theme('colors.neutral.700'); border-radius: 8px; }
+  html.dark ::-webkit-scrollbar-thumb:hover { background: theme('colors.neutral.600'); }
 }
 
 @layer components {
@@ -18,12 +31,16 @@
     @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm
       placeholder:text-slate-400
       focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20
-      disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500;
+      disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500
+      dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100
+      dark:placeholder:text-neutral-500
+      dark:focus:border-brand-400 dark:focus:ring-brand-400/30
+      dark:disabled:bg-neutral-800/60 dark:disabled:text-neutral-500;
   }
   .label {
-    @apply mb-1.5 block text-sm font-medium text-slate-700;
+    @apply mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-300;
   }
   .hint {
-    @apply mt-1 text-xs text-slate-500;
+    @apply mt-1 text-xs text-slate-500 dark:text-neutral-400;
   }
 }

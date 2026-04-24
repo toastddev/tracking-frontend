@@ -26,7 +26,7 @@ export function OfferDetailPage() {
   if (query.isError || !query.data) {
     return (
       <Card>
-        <div className="px-5 py-4 text-sm text-slate-600">Offer not found.</div>
+        <div className="px-5 py-4 text-sm text-slate-600 dark:text-neutral-300">Offer not found.</div>
       </Card>
     );
   }
@@ -37,7 +37,10 @@ export function OfferDetailPage() {
     <>
       <PageHeader
         back={
-          <Link to="/offers" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+          <Link
+            to="/offers"
+            className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+          >
             <ArrowLeft className="h-4 w-4" /> All offers
           </Link>
         }
@@ -57,24 +60,27 @@ export function OfferDetailPage() {
             subtitle="Give this to each affiliate after replacing YOUR_AFFILIATE_ID with their ID. aff_id is required."
           />
           <CardBody className="space-y-4">
-            <div className="flex items-center gap-2">
-              <code className="flex-1 truncate rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <code className="block min-w-0 flex-1 break-all rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200 dark:bg-neutral-950/60 dark:text-neutral-300 dark:ring-neutral-800">
                 {offer.tracking_url}
               </code>
-              {offer.tracking_url && <CopyButton value={offer.tracking_url} />}
+              {offer.tracking_url && <CopyButton value={offer.tracking_url} className="self-start sm:self-auto" />}
             </div>
-            <p className="text-xs text-slate-500">
-              Affiliates can also append <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">&amp;s1=…&amp;s2=…</code>{' '}
-              sub-parameters and ad-platform IDs (<code className="rounded bg-slate-100 px-1 py-0.5 font-mono">gclid</code>,{' '}
-              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">gbraid</code>,{' '}
-              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">fbclid</code>, etc.) — they're captured on the
-              click and available as <code className="rounded bg-slate-100 px-1 py-0.5 font-mono">{'{token}'}</code> in the
-              affiliate destination template below.
+            <p className="text-xs text-slate-500 dark:text-neutral-400">
+              Affiliates can also append{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">&amp;s1=…&amp;s2=…</code>{' '}
+              sub-parameters and ad-platform IDs (
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">gclid</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">gbraid</code>,{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">fbclid</code>,
+              etc.) — they're captured on the click and available as{' '}
+              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">{'{token}'}</code>{' '}
+              in the affiliate destination template below.
             </p>
 
             <div>
               <div className="label">Affiliate destination template</div>
-              <code className="block break-all rounded-md bg-slate-900 px-3 py-2 font-mono text-xs text-slate-100">
+              <code className="block break-all rounded-md bg-slate-900 px-3 py-2 font-mono text-xs text-slate-100 ring-1 ring-slate-800 dark:bg-neutral-950 dark:ring-neutral-800">
                 {offer.base_url}
               </code>
             </div>
@@ -82,7 +88,7 @@ export function OfferDetailPage() {
             {offer.default_params && Object.keys(offer.default_params).length > 0 && (
               <div>
                 <div className="label">Default params</div>
-                <pre className="overflow-x-auto rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200">
+                <pre className="overflow-x-auto rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200 dark:bg-neutral-950/60 dark:text-neutral-300 dark:ring-neutral-800">
                   {JSON.stringify(offer.default_params, null, 2)}
                 </pre>
               </div>
@@ -108,8 +114,8 @@ export function OfferDetailPage() {
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs uppercase tracking-wide text-slate-500">{label}</span>
-      <span className="text-slate-700">{value}</span>
+      <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-neutral-400">{label}</span>
+      <span className="text-slate-700 dark:text-neutral-200">{value}</span>
     </div>
   );
 }

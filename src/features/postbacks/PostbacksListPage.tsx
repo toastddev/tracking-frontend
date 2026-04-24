@@ -49,9 +49,9 @@ export function PostbacksListPage() {
       />
 
       <Card>
-        <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="flex flex-col gap-2 border-b border-slate-200 px-3 py-3 sm:flex-row sm:items-center sm:px-4 dark:border-neutral-800">
+          <div className="relative flex-1 sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-neutral-500" />
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -60,21 +60,23 @@ export function PostbacksListPage() {
               className="pl-8"
             />
           </div>
-          <Button variant="secondary" size="sm" onClick={applySearch}>Search</Button>
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setQ('');
-                setSearchTerm('');
-                setCursorStack([null]);
-              }}
-            >
-              Clear
-            </Button>
-          )}
-          {query.isFetching && <Spinner className="ml-2 text-slate-400" />}
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={applySearch}>Search</Button>
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setQ('');
+                  setSearchTerm('');
+                  setCursorStack([null]);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+            {query.isFetching && <Spinner className="ml-auto text-slate-400 dark:text-neutral-500" />}
+          </div>
         </div>
 
         {query.isLoading ? (
@@ -94,52 +96,90 @@ export function PostbacksListPage() {
           />
         ) : (
           <>
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Network</TH>
-                  <TH>Status</TH>
-                  <TH>Postback URL</TH>
-                  <TH>Created</TH>
-                  <TH className="text-right">Actions</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {query.data?.items.map((n) => (
-                  <TR key={n.network_id}>
-                    <TD>
+            {/* Mobile card list */}
+            <ul className="divide-y divide-slate-100 sm:hidden dark:divide-neutral-800">
+              {query.data?.items.map((n) => (
+                <li key={n.network_id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <Link
                         to={`/postbacks/${encodeURIComponent(n.network_id)}`}
-                        className="font-medium text-slate-900 hover:text-brand-600"
+                        className="block truncate font-medium text-slate-900 dark:text-neutral-100"
                       >
                         {n.name}
                       </Link>
-                      <div className="text-xs text-slate-500">{n.network_id}</div>
-                    </TD>
-                    <TD>
-                      <Badge tone={n.status === 'active' ? 'green' : 'gray'}>{n.status}</Badge>
-                    </TD>
-                    <TD>
-                      <div className="flex items-center gap-2">
-                        <code className="truncate font-mono text-xs text-slate-600 max-w-[280px]">
-                          {n.postback_url}
-                        </code>
-                        {n.postback_url && <CopyButton value={n.postback_url} />}
-                      </div>
-                    </TD>
-                    <TD className="text-xs text-slate-500">{fmtRelative(n.created_at)}</TD>
-                    <TD className="text-right">
-                      <Link
-                        to={`/postbacks/${encodeURIComponent(n.network_id)}`}
-                        className="text-sm font-medium text-brand-600 hover:underline"
-                      >
-                        Open →
-                      </Link>
-                    </TD>
+                      <div className="truncate text-xs text-slate-500 dark:text-neutral-400">{n.network_id}</div>
+                    </div>
+                    <Badge tone={n.status === 'active' ? 'green' : 'gray'}>{n.status}</Badge>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <code className="min-w-0 flex-1 truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
+                      {n.postback_url}
+                    </code>
+                    {n.postback_url && <CopyButton value={n.postback_url} />}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
+                    <span>{fmtRelative(n.created_at)}</span>
+                    <Link
+                      to={`/postbacks/${encodeURIComponent(n.network_id)}`}
+                      className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                    >
+                      Open →
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop table */}
+            <div className="hidden sm:block">
+              <Table>
+                <THead>
+                  <TR>
+                    <TH>Network</TH>
+                    <TH>Status</TH>
+                    <TH>Postback URL</TH>
+                    <TH>Created</TH>
+                    <TH className="text-right">Actions</TH>
                   </TR>
-                ))}
-              </TBody>
-            </Table>
+                </THead>
+                <TBody>
+                  {query.data?.items.map((n) => (
+                    <TR key={n.network_id} className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50">
+                      <TD>
+                        <Link
+                          to={`/postbacks/${encodeURIComponent(n.network_id)}`}
+                          className="font-medium text-slate-900 hover:text-brand-600 dark:text-neutral-100 dark:hover:text-brand-400"
+                        >
+                          {n.name}
+                        </Link>
+                        <div className="text-xs text-slate-500 dark:text-neutral-400">{n.network_id}</div>
+                      </TD>
+                      <TD>
+                        <Badge tone={n.status === 'active' ? 'green' : 'gray'}>{n.status}</Badge>
+                      </TD>
+                      <TD>
+                        <div className="flex items-center gap-2">
+                          <code className="max-w-[280px] truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
+                            {n.postback_url}
+                          </code>
+                          {n.postback_url && <CopyButton value={n.postback_url} />}
+                        </div>
+                      </TD>
+                      <TD className="text-xs text-slate-500 dark:text-neutral-400">{fmtRelative(n.created_at)}</TD>
+                      <TD className="text-right">
+                        <Link
+                          to={`/postbacks/${encodeURIComponent(n.network_id)}`}
+                          className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+                        >
+                          Open →
+                        </Link>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              </Table>
+            </div>
             <Pagination
               hasPrev={cursorStack.length > 1}
               hasNext={!!query.data?.nextCursor}
