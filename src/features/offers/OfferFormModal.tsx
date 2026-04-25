@@ -109,13 +109,20 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
       {created ? (
         <div className="space-y-4">
           <div className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/30">
-            Offer created. Replace <code>YOUR_AFFILIATE_ID</code> with the affiliate's ID before sharing.
+            Offer created. You can copy the tracking URL below.
           </div>
           <div>
             <label className="label">Tracking URL</label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input readOnly value={created.tracking_url ?? ''} className="font-mono text-xs" />
-              <CopyButton value={created.tracking_url ?? ''} className="self-start sm:self-auto" />
+              <Input 
+                readOnly 
+                value={created.tracking_url ? `${created.tracking_url}${created.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(created.offer_id)}` : ''} 
+                className="font-mono text-xs" 
+              />
+              <CopyButton 
+                value={created.tracking_url ? `${created.tracking_url}${created.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(created.offer_id)}` : ''} 
+                className="self-start sm:self-auto" 
+              />
             </div>
             <p className="hint">
               <code>aff_id</code> is required. Affiliates can also append <code>&amp;s1=…&amp;gclid=…</code> sub-params and ad-platform IDs.

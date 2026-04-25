@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { Offer, Page } from '@/types';
+import type { Offer, Page, ClickRecord } from '@/types';
 
 export interface ListParams {
   q?: string;
@@ -30,5 +30,10 @@ export const offersApi = {
   },
   delete(id: string) {
     return api<{ ok: true }>(`/api/offers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+  clicks(offerId: string, params: { cursor?: string | null; limit?: number; from?: string; to?: string } = {}) {
+    return api<Page<ClickRecord>>('/api/clicks', {
+      query: { offer_id: offerId, cursor: params.cursor ?? undefined, limit: params.limit, from: params.from, to: params.to },
+    });
   },
 };

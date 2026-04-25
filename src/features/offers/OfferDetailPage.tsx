@@ -14,6 +14,7 @@ import { ApiError } from '@/lib/api';
 import { fmtDateTime } from '@/lib/format';
 import { offersApi } from './api';
 import { OfferFormModal } from './OfferFormModal';
+import { OfferClicks } from './OfferClicks';
 
 export function OfferDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -132,6 +133,13 @@ export function OfferDetailPage() {
             <DetailRow label="Created" value={fmtDateTime(offer.created_at)} />
             <DetailRow label="Updated" value={fmtDateTime(offer.updated_at)} />
           </CardBody>
+        </Card>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="mb-4 text-lg font-medium text-slate-900 dark:text-neutral-100">Recent Clicks</h2>
+        <Card>
+          <OfferClicks offerId={offer.offer_id} />
         </Card>
       </div>
 
