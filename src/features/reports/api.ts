@@ -7,12 +7,12 @@ import type {
   TimeseriesPoint,
 } from '@/types';
 
-export interface ReportParams {
+export type ReportParams = {
   from?: string; // ISO
   to?: string;   // ISO
   offer_id?: string;
   network_id?: string;
-}
+};
 
 export interface ClickListParams {
   from?: string;

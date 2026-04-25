@@ -49,7 +49,8 @@ function tickDate(d: string): string {
   return `${dt.toLocaleDateString(undefined, { month: 'short' })} ${dt.getDate()}`;
 }
 
-function tooltipLabel(d: string): string {
+function tooltipLabel(label: any): string {
+  const d = String(label);
   const dt = new Date(d);
   return Number.isNaN(dt.getTime())
     ? d
@@ -100,7 +101,7 @@ export function RevenueChart({ points }: Props) {
           }}
           labelStyle={{ color: c.tooltipText, marginBottom: 4 }}
           labelFormatter={tooltipLabel}
-          formatter={(value: number) => [fmtMoney(value), 'Revenue']}
+          formatter={(value: any) => [fmtMoney(Number(value)), 'Revenue']}
         />
         <Area
           type="monotone"
@@ -154,7 +155,7 @@ export function ActivityChart({ points }: Props) {
           }}
           labelStyle={{ color: c.tooltipText, marginBottom: 4 }}
           labelFormatter={tooltipLabel}
-          formatter={(value: number, name: string) => [fmtCount(value), name]}
+          formatter={(value: any, name: any) => [fmtCount(Number(value)), String(name)]}
         />
         <Legend wrapperStyle={{ fontSize: 12, color: c.axis }} iconType="circle" />
         <Line
