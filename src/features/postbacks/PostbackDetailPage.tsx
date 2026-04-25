@@ -119,8 +119,9 @@ export function PostbackDetailPage() {
               </div>
               <p className="hint">
                 Paste this into the network's postback field as-is. The parameter names on the left
-                (<Tok>click_id</Tok>, <Tok>payout</Tok>, …) are fixed — the network substitutes each{' '}
-                <Tok>{'{macro}'}</Tok> with the actual value before firing.
+                (<Tok>click_id</Tok>, <Tok>payout</Tok>, …) are fixed — the network substitutes the macro
+                on the right with the actual value before firing. If your macro doesn't use standard characters
+                like <Tok>#</Tok> or <Tok>[]</Tok>, we automatically wrap it in <Tok>{'{...}'}</Tok>.
               </p>
             </div>
 
