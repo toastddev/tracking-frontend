@@ -110,15 +110,7 @@ export function PostbackDetailPage() {
           <CardHeader title="Postback URL" subtitle="Configure this URL in your network's dashboard. They append their parameters to it." />
           <CardBody className="space-y-4">
             <div>
-              <label className="label">Base URL</label>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Input readOnly value={network.postback_url ?? ''} className="font-mono text-xs" />
-                {network.postback_url && <CopyButton value={network.postback_url} className="self-start sm:self-auto" />}
-              </div>
-            </div>
-
-            <div>
-              <label className="label">Example URL with your mapped parameters</label>
+              <label className="label">Postback URL with mapped parameters</label>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                 <code className="flex-1 break-all rounded-md bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700 ring-1 ring-slate-200 dark:bg-neutral-950/60 dark:text-neutral-300 dark:ring-neutral-800">
                   {exampleUrl}

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -14,6 +14,8 @@ interface Props {
 const sizes = { sm: 'max-w-md', md: 'max-w-xl', lg: 'max-w-3xl' };
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: Props) {
+  const backdropMouseDown = useRef(false);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -30,7 +32,19 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: P
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-900/50 p-0 backdrop-blur-sm animate-fade-in sm:items-start sm:p-4 dark:bg-neutral-950/70"
-      onClick={onClose}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          backdropMouseDown.current = true;
+        } else {
+          backdropMouseDown.current = false;
+        }
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && backdropMouseDown.current) {
+          onClose();
+        }
+        backdropMouseDown.current = false;
+      }}
     >
       <div
         className={cn(
