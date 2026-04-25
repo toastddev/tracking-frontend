@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Package } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Package, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,8 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Spinner, CenteredSpinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CopyButton } from '@/components/ui/CopyButton';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ApiError } from '@/lib/api';
 import { fmtRelative } from '@/lib/format';
 import { offersApi } from './api';
 import { OfferFormModal } from './OfferFormModal';
@@ -23,12 +25,28 @@ export function OffersListPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteOffer, setDeleteOffer] = useState<{ id: string; name: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const qc = useQueryClient();
 
   const cursor = cursorStack[cursorStack.length - 1] ?? null;
 
   const query = useQuery({
     queryKey: ['offers', { q: searchTerm, cursor }],
     queryFn: () => offersApi.list({ q: searchTerm || undefined, cursor: cursor ?? undefined, limit: PAGE_SIZE }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => offersApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['offers'] });
+      setDeleteOffer(null);
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) setDeleteError(err.code ?? err.message);
+      else if (err instanceof Error) setDeleteError(err.message);
+      else setDeleteError('Could not delete offer');
+    },
   });
 
   function applySearch() {
@@ -98,37 +116,52 @@ export function OffersListPage() {
           <>
             {/* Mobile card list */}
             <ul className="divide-y divide-slate-100 sm:hidden dark:divide-neutral-800">
-              {query.data?.items.map((offer) => (
-                <li key={offer.offer_id} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Link
-                        to={`/offers/${encodeURIComponent(offer.offer_id)}`}
-                        className="block truncate font-medium text-slate-900 dark:text-neutral-100"
-                      >
-                        {offer.name}
-                      </Link>
-                      <div className="truncate text-xs text-slate-500 dark:text-neutral-400">{offer.offer_id}</div>
+              {query.data?.items.map((offer) => {
+                const fullUrl = offer.tracking_url ? `${offer.tracking_url}${offer.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(offer.offer_id)}` : '';
+                return (
+                  <li key={offer.offer_id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link
+                          to={`/offers/${encodeURIComponent(offer.offer_id)}`}
+                          className="block truncate font-medium text-slate-900 dark:text-neutral-100"
+                        >
+                          {offer.name}
+                        </Link>
+                        <div className="truncate text-xs text-slate-500 dark:text-neutral-400">{offer.offer_id}</div>
+                      </div>
+                      <Badge tone={offer.status === 'active' ? 'green' : 'gray'}>{offer.status}</Badge>
                     </div>
-                    <Badge tone={offer.status === 'active' ? 'green' : 'gray'}>{offer.status}</Badge>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <code className="min-w-0 flex-1 truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
-                      {offer.tracking_url}
-                    </code>
-                    {offer.tracking_url && <CopyButton value={offer.tracking_url} />}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
-                    <span>{fmtRelative(offer.created_at)}</span>
-                    <Link
-                      to={`/offers/${encodeURIComponent(offer.offer_id)}`}
-                      className="font-medium text-brand-600 hover:underline dark:text-brand-400"
-                    >
-                      Open →
-                    </Link>
-                  </div>
-                </li>
-              ))}
+                    <div className="mt-2 flex items-center gap-2">
+                      <code className="min-w-0 flex-1 truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
+                        {fullUrl}
+                      </code>
+                      {fullUrl && <CopyButton value={fullUrl} />}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
+                      <span>{fmtRelative(offer.created_at)}</span>
+                      <div className="flex items-center gap-3">
+                        <Link
+                          to={`/offers/${encodeURIComponent(offer.offer_id)}`}
+                          className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                        >
+                          Open →
+                        </Link>
+                        <button
+                          onClick={() => {
+                            setDeleteError(null);
+                            setDeleteOffer({ id: offer.offer_id, name: offer.name });
+                          }}
+                          className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          title="Delete offer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
 
             {/* Desktop table */}
@@ -144,39 +177,54 @@ export function OffersListPage() {
                   </TR>
                 </THead>
                 <TBody>
-                  {query.data?.items.map((offer) => (
-                    <TR key={offer.offer_id} className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50">
-                      <TD>
-                        <Link
-                          to={`/offers/${encodeURIComponent(offer.offer_id)}`}
-                          className="font-medium text-slate-900 hover:text-brand-600 dark:text-neutral-100 dark:hover:text-brand-400"
-                        >
-                          {offer.name}
-                        </Link>
-                        <div className="text-xs text-slate-500 dark:text-neutral-400">{offer.offer_id}</div>
-                      </TD>
-                      <TD>
-                        <Badge tone={offer.status === 'active' ? 'green' : 'gray'}>{offer.status}</Badge>
-                      </TD>
-                      <TD>
-                        <div className="flex items-center gap-2">
-                          <code className="max-w-[280px] truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
-                            {offer.tracking_url}
-                          </code>
-                          {offer.tracking_url && <CopyButton value={offer.tracking_url} />}
-                        </div>
-                      </TD>
-                      <TD className="text-xs text-slate-500 dark:text-neutral-400">{fmtRelative(offer.created_at)}</TD>
-                      <TD className="text-right">
-                        <Link
-                          to={`/offers/${encodeURIComponent(offer.offer_id)}`}
-                          className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
-                        >
-                          Open →
-                        </Link>
-                      </TD>
-                    </TR>
-                  ))}
+                  {query.data?.items.map((offer) => {
+                    const fullUrl = offer.tracking_url ? `${offer.tracking_url}${offer.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(offer.offer_id)}` : '';
+                    return (
+                      <TR key={offer.offer_id} className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50">
+                        <TD>
+                          <Link
+                            to={`/offers/${encodeURIComponent(offer.offer_id)}`}
+                            className="font-medium text-slate-900 hover:text-brand-600 dark:text-neutral-100 dark:hover:text-brand-400"
+                          >
+                            {offer.name}
+                          </Link>
+                          <div className="text-xs text-slate-500 dark:text-neutral-400">{offer.offer_id}</div>
+                        </TD>
+                        <TD>
+                          <Badge tone={offer.status === 'active' ? 'green' : 'gray'}>{offer.status}</Badge>
+                        </TD>
+                        <TD>
+                          <div className="flex items-center gap-2">
+                            <code className="max-w-[280px] truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
+                              {fullUrl}
+                            </code>
+                            {fullUrl && <CopyButton value={fullUrl} />}
+                          </div>
+                        </TD>
+                        <TD className="text-xs text-slate-500 dark:text-neutral-400">{fmtRelative(offer.created_at)}</TD>
+                        <TD className="text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <Link
+                              to={`/offers/${encodeURIComponent(offer.offer_id)}`}
+                              className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400"
+                            >
+                              Open →
+                            </Link>
+                            <button
+                              onClick={() => {
+                                setDeleteError(null);
+                                setDeleteOffer({ id: offer.offer_id, name: offer.name });
+                              }}
+                              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                              title="Delete offer"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </TD>
+                      </TR>
+                    );
+                  })}
                 </TBody>
               </Table>
             </div>
@@ -192,6 +240,25 @@ export function OffersListPage() {
       </Card>
 
       <OfferFormModal open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      {deleteOffer && (
+        <ConfirmDialog
+          open={!!deleteOffer}
+          onCancel={() => !deleteMutation.isPending && setDeleteOffer(null)}
+          onConfirm={() => deleteMutation.mutate(deleteOffer.id)}
+          title="Delete offer?"
+          description={
+            <>
+              This permanently removes <strong>{deleteOffer.name}</strong> ({deleteOffer.id}). Existing clicks and conversions
+              already linked to it stay in the database, but the offer itself can no longer be edited or fired against.
+            </>
+          }
+          confirmLabel="Delete offer"
+          variant="danger"
+          busy={deleteMutation.isPending}
+          error={deleteError}
+        />
+      )}
     </>
   );
 }

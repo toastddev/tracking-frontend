@@ -44,6 +44,9 @@ export const networksApi = {
   update(id: string, patch: Partial<NetworkUpsert>) {
     return api<Network>(`/api/networks/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch });
   },
+  delete(id: string) {
+    return api<{ ok: true }>(`/api/networks/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
   conversions(network_id: string, params: ListConversionParams = {}) {
     return api<Page<ConversionRecord>>(`/api/networks/${encodeURIComponent(network_id)}/conversions`, {
       query: {

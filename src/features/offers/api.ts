@@ -28,4 +28,7 @@ export const offersApi = {
   update(id: string, patch: Partial<Omit<Offer, 'offer_id' | 'created_at' | 'updated_at' | 'tracking_url'>>) {
     return api<Offer>(`/api/offers/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch });
   },
+  delete(id: string) {
+    return api<{ ok: true }>(`/api/offers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
 };

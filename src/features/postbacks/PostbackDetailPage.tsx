@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Pencil } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/Badge';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { CenteredSpinner } from '@/components/ui/Spinner';
 import { Input } from '@/components/ui/Input';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ApiError } from '@/lib/api';
 import { fmtDateTime } from '@/lib/format';
 import { networksApi } from './api';
 import { PostbackFormModal } from './PostbackFormModal';
@@ -16,12 +18,30 @@ import { EventLog } from './EventLog';
 
 export function PostbackDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: ['network', id],
     queryFn: () => networksApi.get(id),
     enabled: !!id,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => networksApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['networks'] });
+      qc.removeQueries({ queryKey: ['network', id] });
+      navigate('/postbacks', { replace: true });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) setDeleteError(err.code ?? err.message);
+      else if (err instanceof Error) setDeleteError(err.message);
+      else setDeleteError('Could not delete postback');
+    },
   });
 
   if (query.isLoading) return <CenteredSpinner />;
@@ -80,9 +100,20 @@ export function PostbackDetailPage() {
         title={network.name}
         description={network.network_id}
         actions={
-          <Button variant="secondary" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" /> Edit mappings
-          </Button>
+          <>
+            <Button variant="secondary" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4" /> Edit mappings
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </Button>
+          </>
         }
       />
 
@@ -155,6 +186,24 @@ export function PostbackDetailPage() {
       </div>
 
       <PostbackFormModal open={editOpen} onClose={() => setEditOpen(false)} initial={network} />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onCancel={() => !deleteMutation.isPending && setDeleteOpen(false)}
+        onConfirm={() => deleteMutation.mutate()}
+        title="Delete postback?"
+        description={
+          <>
+            This permanently removes the <strong>{network.name}</strong> ({network.network_id}) postback configuration.
+            Past conversion records stay in the database, but the network can no longer fire successful postbacks against
+            this URL until it's recreated.
+          </>
+        }
+        confirmLabel="Delete postback"
+        variant="danger"
+        busy={deleteMutation.isPending}
+        error={deleteError}
+      />
     </>
   );
 }
