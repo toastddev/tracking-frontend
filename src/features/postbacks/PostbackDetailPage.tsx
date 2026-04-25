@@ -15,6 +15,7 @@ import { fmtDateTime } from '@/lib/format';
 import { networksApi } from './api';
 import { PostbackFormModal } from './PostbackFormModal';
 import { EventLog } from './EventLog';
+import { buildExampleUrl } from './utils';
 
 export function PostbackDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -55,22 +56,9 @@ export function PostbackDetailPage() {
 
   const network = query.data;
 
-  // Build an example URL the user can copy into the network's dashboard.
-  // LHS param names are FIXED canonical names; RHS is the network's macro
-  // (taken from the mapping). The network substitutes {<macro>} before firing,
-  // so the backend always receives the fixed canonical names.
-  const exampleParts: string[] = [];
-  if (network.mapping_click_id)  exampleParts.push(`click_id={${network.mapping_click_id}}`);
-  if (network.mapping_payout)    exampleParts.push(`payout={${network.mapping_payout}}`);
-  if (network.mapping_currency)  exampleParts.push(`currency={${network.mapping_currency}}`);
-  if (network.mapping_status)    exampleParts.push(`status={${network.mapping_status}}`);
-  if (network.mapping_txn_id)    exampleParts.push(`transaction_id={${network.mapping_txn_id}}`);
-  if (network.mapping_timestamp) exampleParts.push(`event_time={${network.mapping_timestamp}}`);
+  const exampleUrl = buildExampleUrl(network);
+
   const extraEntries = Object.entries(network.extra_mappings ?? {});
-  for (const [paramName, macro] of extraEntries) {
-    if (macro) exampleParts.push(`${paramName}={${macro}}`);
-  }
-  const exampleUrl = `${network.postback_url ?? ''}${exampleParts.length ? '?' + exampleParts.join('&') : ''}`;
 
   const mappingRows: { key: string; label: string; value?: string }[] = [
     { key: 'mapping_click_id',  label: 'Click ID',         value: network.mapping_click_id },

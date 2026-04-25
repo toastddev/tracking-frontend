@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { ApiError } from '@/lib/api';
 import { networksApi } from './api';
+import { buildExampleUrl } from './utils';
 import type { Network } from '@/types';
 
 interface Props {
@@ -214,10 +215,10 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
             Postback created. Configure this URL in your network's dashboard.
           </div>
           <div>
-            <label className="label">Postback URL</label>
+            <label className="label">Postback URL (with your mapped parameters)</label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input readOnly value={created.postback_url ?? ''} className="font-mono text-xs" />
-              <CopyButton value={created.postback_url ?? ''} className="self-start sm:self-auto" />
+              <Input readOnly value={created ? buildExampleUrl(created) : ''} className="font-mono text-xs" />
+              <CopyButton value={created ? buildExampleUrl(created) : ''} className="self-start sm:self-auto" />
             </div>
           </div>
         </div>

@@ -15,6 +15,7 @@ import { CopyButton } from '@/components/ui/CopyButton';
 import { fmtRelative } from '@/lib/format';
 import { networksApi } from './api';
 import { PostbackFormModal } from './PostbackFormModal';
+import { buildExampleUrl } from './utils';
 
 const PAGE_SIZE = 20;
 
@@ -114,9 +115,9 @@ export function PostbacksListPage() {
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <code className="min-w-0 flex-1 truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
-                      {n.postback_url}
+                      {buildExampleUrl(n)}
                     </code>
-                    {n.postback_url && <CopyButton value={n.postback_url} />}
+                    {n.postback_url && <CopyButton value={buildExampleUrl(n)} />}
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
                     <span>{fmtRelative(n.created_at)}</span>
@@ -161,9 +162,9 @@ export function PostbacksListPage() {
                       <TD>
                         <div className="flex items-center gap-2">
                           <code className="max-w-[280px] truncate font-mono text-xs text-slate-600 dark:text-neutral-400">
-                            {n.postback_url}
+                            {buildExampleUrl(n)}
                           </code>
-                          {n.postback_url && <CopyButton value={n.postback_url} />}
+                          {n.postback_url && <CopyButton value={buildExampleUrl(n)} />}
                         </div>
                       </TD>
                       <TD className="text-xs text-slate-500 dark:text-neutral-400">{fmtRelative(n.created_at)}</TD>
