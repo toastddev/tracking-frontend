@@ -252,9 +252,9 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
           <div className="rounded-md bg-slate-50 px-4 py-3 ring-1 ring-slate-200 dark:bg-neutral-950/60 dark:ring-neutral-800">
             <h3 className="text-sm font-semibold text-slate-900 dark:text-neutral-100">Parameter mapping</h3>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-400">
-              Each value is the <em>macro</em> this network uses for that field — e.g. Kelkoo{' '}
-              <code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">ClickId</code>, TUNE{' '}
-              <code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">aff_sub</code>. URL parameter names
+              Each value is the exact <em>macro</em> or literal this network uses for that field — e.g. Kelkoo{' '}
+              <code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">${'{'}ClickId{'}'}</code>, TUNE{' '}
+              <code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">{'{'}aff_sub{'}'}</code>. You must include any required wrapper characters. URL parameter names
               (<code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">click_id</code>,{' '}
               <code className="rounded bg-white px-1 py-0.5 font-mono dark:bg-neutral-800 dark:text-neutral-300">payout</code>, …) stay fixed.
             </p>
