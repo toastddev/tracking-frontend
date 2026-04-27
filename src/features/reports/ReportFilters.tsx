@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 
-export type RangePreset = '24h' | '7d' | '30d' | '90d' | 'custom';
+export type RangePreset = '1d' | '2d' | '7d' | '30d' | '90d' | 'custom';
 
 export interface ReportRange {
   from: string; // ISO
@@ -11,14 +12,18 @@ export interface ReportRange {
   preset: RangePreset;
 }
 
+export const DEFAULT_PRESET: RangePreset = '30d';
+
 const PRESETS: { key: RangePreset; label: string; hours: number }[] = [
-  { key: '24h', label: '24h', hours: 24 },
-  { key: '7d',  label: '7d',  hours: 24 * 7 },
-  { key: '30d', label: '30d', hours: 24 * 30 },
-  { key: '90d', label: '90d', hours: 24 * 90 },
+  { key: '1d',  label: '1 day',   hours: 24 },
+  { key: '2d',  label: '2 days',  hours: 48 },
+  { key: '7d',  label: 'Week',    hours: 24 * 7 },
+  { key: '30d', label: 'Month',   hours: 24 * 30 },
+  { key: '90d', label: '90 days', hours: 24 * 90 },
 ];
 
-function preset(preset: RangePreset): ReportRange {
+export function buildPresetRange(preset: RangePreset): ReportRange {
+  if (preset === 'custom') throw new Error('cannot build custom from preset');
   const p = PRESETS.find((x) => x.key === preset);
   if (!p) throw new Error(`bad preset ${preset}`);
   const to = new Date();
@@ -57,6 +62,8 @@ export function ReportFilters({ value, onChange }: Props) {
     onChange({ from: f.toISOString(), to: t.toISOString(), preset: 'custom' });
   }
 
+  const isDefault = value.preset === DEFAULT_PRESET;
+
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-card sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-card-dark">
       <div className="inline-flex flex-wrap items-center gap-1">
@@ -68,7 +75,7 @@ export function ReportFilters({ value, onChange }: Props) {
               type="button"
               onClick={() => {
                 setCustomOpen(false);
-                onChange(preset(p.key));
+                onChange(buildPresetRange(p.key));
               }}
               className={cn(
                 'inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors',
@@ -92,6 +99,22 @@ export function ReportFilters({ value, onChange }: Props) {
           )}
         >
           Custom
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCustomOpen(false);
+            onChange(buildPresetRange(DEFAULT_PRESET));
+          }}
+          disabled={isDefault}
+          title="Reset range to last 30 days"
+          className={cn(
+            'ml-1 inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium transition-colors',
+            'text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40 disabled:hover:bg-transparent',
+            'dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200'
+          )}
+        >
+          <RotateCcw className="h-3 w-3" /> Reset
         </button>
       </div>
 

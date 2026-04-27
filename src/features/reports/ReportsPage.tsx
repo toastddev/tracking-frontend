@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { CenteredSpinner, Spinner } from '@/components/ui/Spinner';
 import { reportsApi } from './api';
-import { ReportFilters, type ReportRange } from './ReportFilters';
+import { ReportFilters, buildPresetRange, type ReportRange } from './ReportFilters';
 import { ActivityChart, RevenueChart } from './ReportChart';
 import { ClicksReportTab } from './ClicksReportTab';
 import { ConversionsReportTab } from './ConversionsReportTab';
@@ -21,9 +21,7 @@ const TABS: { key: Tab; label: string; description: string }[] = [
 ];
 
 function defaultRange(): ReportRange {
-  const to = new Date();
-  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
-  return { from: from.toISOString(), to: to.toISOString(), preset: '30d' };
+  return buildPresetRange('30d');
 }
 
 export function ReportsPage() {

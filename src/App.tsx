@@ -7,6 +7,9 @@ import { OfferDetailPage } from '@/features/offers/OfferDetailPage';
 import { PostbacksListPage } from '@/features/postbacks/PostbacksListPage';
 import { PostbackDetailPage } from '@/features/postbacks/PostbackDetailPage';
 import { ReportsPage } from '@/features/reports/ReportsPage';
+import { ConnectionsPage } from '@/features/connections/ConnectionsPage';
+import { GoogleAdsOAuthCallbackPage } from '@/features/connections/GoogleAdsOAuthCallbackPage';
+import { SettingsPage } from '@/features/settings/SettingsPage';
 
 export default function App() {
   return (
@@ -26,6 +29,9 @@ export default function App() {
         <Route path="/offers/:id" element={<OfferDetailPage />} />
         <Route path="/postbacks" element={<PostbacksListPage />} />
         <Route path="/postbacks/:id" element={<PostbackDetailPage />} />
+        <Route path="/connections" element={<ConnectionsPage />} />
+        <Route path="/oauth/google-ads/callback" element={<GoogleAdsOAuthCallbackPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/reports" replace />} />

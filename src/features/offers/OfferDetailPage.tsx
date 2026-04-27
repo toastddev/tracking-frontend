@@ -15,6 +15,7 @@ import { fmtDateTime } from '@/lib/format';
 import { offersApi } from './api';
 import { OfferFormModal } from './OfferFormModal';
 import { OfferClicks } from './OfferClicks';
+import { GoogleAdsRoutingCard } from '@/features/connections/GoogleAdsRoutingCard';
 
 export function OfferDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -134,6 +135,10 @@ export function OfferDetailPage() {
             <DetailRow label="Updated" value={fmtDateTime(offer.updated_at)} />
           </CardBody>
         </Card>
+      </div>
+
+      <div className="mt-8">
+        <GoogleAdsRoutingCard scopeType="offer" scopeId={offer.offer_id} />
       </div>
 
       <div className="mt-8">

@@ -16,6 +16,7 @@ import { networksApi } from './api';
 import { PostbackFormModal } from './PostbackFormModal';
 import { EventLog } from './EventLog';
 import { buildExampleUrl } from './utils';
+import { GoogleAdsRoutingCard } from '@/features/connections/GoogleAdsRoutingCard';
 
 export function PostbackDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -159,6 +160,10 @@ export function PostbackDetailPage() {
             </div>
           </CardBody>
         </Card>
+
+        <div className="lg:col-span-3">
+          <GoogleAdsRoutingCard scopeType="network" scopeId={network.network_id} />
+        </div>
 
         <Card className="lg:col-span-3">
           <CardHeader title="Event log" subtitle="Latest postbacks from this network. Click a row for full detail." />
