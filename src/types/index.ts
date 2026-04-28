@@ -23,6 +23,7 @@ export interface Network {
   mapping_timestamp?: string;
   extra_mappings?: Record<string, string>;
   default_status?: string;
+  postback_api_id?: string;
   created_at?: string;
   updated_at?: string;
   postback_url?: string;
@@ -95,4 +96,108 @@ export interface TimeseriesPoint {
   postbacks: number;
   conversions: number;
   revenue: number;
+}
+
+// ── Affiliate API types ───────────────────────────────────────────────
+export type AffiliateApiKind = 'rest' | 'graphql';
+export type AffiliateApiResponseFormat = 'json' | 'xml' | 'auto';
+export type AffiliateApiAuthType = 'none' | 'api_key' | 'bearer' | 'basic' | 'custom';
+export type AffiliateApiPaginationType = 'none' | 'page' | 'offset' | 'cursor';
+
+export interface AffiliateApiAuthView {
+  type: AffiliateApiAuthType;
+  in?: 'header' | 'query';
+  key_name?: string;
+  username?: string;
+  has_secret?: boolean;
+}
+
+export interface AffiliateApiPagination {
+  type: AffiliateApiPaginationType;
+  page_param?: string;
+  start_page?: number;
+  offset_param?: string;
+  cursor_param?: string;
+  next_cursor_path?: string;
+  size_param?: string;
+  page_size?: number;
+  max_pages?: number;
+}
+
+export interface AffiliateApiIncremental {
+  enabled: boolean;
+  from_param?: string;
+  to_param?: string;
+  format?: 'iso' | 'unix_ms' | 'unix_s' | 'date';
+  lookback_minutes?: number;
+}
+
+export interface AffiliateApiMapping {
+  items_path: string;
+  external_id_path: string;
+  click_id_path: string;
+  payout_path?: string;
+  currency_path?: string;
+  status_path?: string;
+  txn_id_path?: string;
+  event_time_path?: string;
+  status_map?: Record<string, string>;
+  default_status?: string;
+}
+
+export interface AffiliateApiSchedule {
+  enabled: boolean;
+  runs_per_day: number;
+  next_run_at?: string;
+  last_run_at?: string;
+  last_status?: 'ok' | 'partial' | 'error';
+}
+
+export interface AffiliateApiRequestConfig {
+  http_method?: 'GET' | 'POST';
+  query_params?: Record<string, string>;
+  body_template?: string | null;
+  headers?: Record<string, string>;
+  graphql_query?: string;
+  graphql_variables?: Record<string, unknown>;
+}
+
+export interface AffiliateApi {
+  api_id: string;
+  name: string;
+  status: Status;
+  kind: AffiliateApiKind;
+  response_format?: AffiliateApiResponseFormat;
+  base_url: string;
+  network_id?: string;
+  auth: AffiliateApiAuthView;
+  request: AffiliateApiRequestConfig;
+  pagination: AffiliateApiPagination;
+  incremental: AffiliateApiIncremental;
+  mapping: AffiliateApiMapping;
+  schedule: AffiliateApiSchedule;
+  timeout_ms?: number;
+  max_records_per_run?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AffiliateApiRunRecord {
+  run_id: string;
+  api_id: string;
+  status: 'ok' | 'partial' | 'error' | 'running' | 'skipped';
+  started_at: string;
+  finished_at?: string;
+  duration_ms?: number;
+  pages_fetched?: number;
+  records_seen?: number;
+  records_inserted?: number;
+  records_skipped_duplicate?: number;
+  records_skipped_unknown_click?: number;
+  records_failed?: number;
+  http_calls?: number;
+  error?: string;
+  window_from?: string;
+  window_to?: string;
+  triggered_by?: 'schedule' | 'manual';
 }

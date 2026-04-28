@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { ApiError } from '@/lib/api';
 import { networksApi } from './api';
+import { affiliateApisApi } from '@/features/affiliate-apis/api';
 import { buildExampleUrl } from './utils';
 import type { Network } from '@/types';
 
@@ -42,6 +43,7 @@ interface FormState {
   mapping_txn_id: string;
   mapping_timestamp: string;
   default_status: string;
+  postback_api_id: string;
   extras: ExtraRow[];
 }
 
@@ -49,6 +51,7 @@ const empty: FormState = {
   network_id: '', name: '', status: 'active',
   mapping_click_id: 'click_id', mapping_payout: '', mapping_currency: '',
   mapping_status: '', mapping_txn_id: '', mapping_timestamp: '', default_status: 'approved',
+  postback_api_id: '',
   extras: [],
 };
 
@@ -88,12 +91,19 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
         mapping_txn_id: initial.mapping_txn_id ?? '',
         mapping_timestamp: initial.mapping_timestamp ?? '',
         default_status: initial.default_status ?? 'approved',
+        postback_api_id: initial.postback_api_id ?? '',
         extras: extrasFromNetwork(initial),
       });
     } else {
       setForm(empty);
     }
   }, [open, initial]);
+
+  const apisQuery = useQuery({
+    queryKey: ['affiliate-apis-for-network'],
+    queryFn: () => affiliateApisApi.list({ limit: 100 }),
+    enabled: open,
+  });
 
   const update = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -154,6 +164,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
         mapping_txn_id: form.mapping_txn_id.trim() || undefined,
         mapping_timestamp: form.mapping_timestamp.trim() || undefined,
         default_status: form.default_status.trim() || undefined,
+        postback_api_id: form.postback_api_id.trim() || undefined,
         extra_mappings: extras.value,
       };
       if (editing) return networksApi.update(initial!.network_id, payload);
@@ -266,13 +277,23 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
               <Field label="Transaction ID" value={form.mapping_txn_id} onChange={update('mapping_txn_id')} placeholder="tx" />
               <Field label="Event timestamp" value={form.mapping_timestamp} onChange={update('mapping_timestamp')} placeholder="ts" />
             </div>
-            <div className="mt-3">
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field
                 label="Default status fallback"
                 value={form.default_status}
                 onChange={update('default_status')}
                 placeholder="approved"
               />
+              <div>
+                <label className="label">API integration (optional)</label>
+                <Select value={form.postback_api_id} onChange={update('postback_api_id')}>
+                  <option value="">— Postback only (default) —</option>
+                  {apisQuery.data?.items.map((a) => (
+                    <option key={a.api_id} value={a.api_id}>{a.name} ({a.api_id})</option>
+                  ))}
+                </Select>
+                <p className="hint">If set, the API pull is the source of truth. Postbacks still arrive but are flagged as audit-only and excluded from outbound forwarding.</p>
+              </div>
             </div>
 
             <div className="mt-5 border-t border-slate-200 pt-4 dark:border-neutral-800">

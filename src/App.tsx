@@ -9,6 +9,8 @@ import { PostbackDetailPage } from '@/features/postbacks/PostbackDetailPage';
 import { ReportsPage } from '@/features/reports/ReportsPage';
 import { ConnectionsPage } from '@/features/connections/ConnectionsPage';
 import { GoogleAdsOAuthCallbackPage } from '@/features/connections/GoogleAdsOAuthCallbackPage';
+import { AffApiListPage } from '@/features/affiliate-apis/AffApiListPage';
+import { AffApiDetailPage } from '@/features/affiliate-apis/AffApiDetailPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 
 export default function App() {
@@ -29,6 +31,8 @@ export default function App() {
         <Route path="/offers/:id" element={<OfferDetailPage />} />
         <Route path="/postbacks" element={<PostbacksListPage />} />
         <Route path="/postbacks/:id" element={<PostbackDetailPage />} />
+        <Route path="/aff-api" element={<AffApiListPage />} />
+        <Route path="/aff-api/:id" element={<AffApiDetailPage />} />
         <Route path="/connections" element={<ConnectionsPage />} />
         <Route path="/oauth/google-ads/callback" element={<GoogleAdsOAuthCallbackPage />} />
         <Route path="/settings" element={<SettingsPage />} />
