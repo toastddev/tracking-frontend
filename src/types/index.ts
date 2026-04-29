@@ -104,6 +104,50 @@ export interface TimeseriesPoint {
   revenue: number;
 }
 
+// ── Per-offer reports (TTL-safe rollup collection) ────────────────────
+export interface OfferDailyPoint {
+  date: string;
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  revenue: number;
+}
+
+export interface OfferReportSummary {
+  offer_id: string;
+  offer_name?: string;
+  status?: Status;
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+  cvr: number;
+  epc: number;
+  rpm: number;
+  avg_payout: number;
+  approval_rate: number;
+  est_month_end_revenue: number;
+  series: OfferDailyPoint[];
+}
+
+export interface OfferReportsResponse {
+  from: string;
+  to: string;
+  offers: OfferReportSummary[];
+  totals: {
+    clicks: number;
+    postbacks: number;
+    conversions: number;
+    unverified: number;
+    revenue: number;
+    est_month_end_revenue: number;
+  };
+}
+
 // ── Affiliate API types ───────────────────────────────────────────────
 export type AffiliateApiKind = 'rest' | 'graphql';
 export type AffiliateApiResponseFormat = 'json' | 'xml' | 'auto';

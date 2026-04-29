@@ -2,6 +2,7 @@ import { api } from '@/lib/api';
 import type {
   ClickRecord,
   ConversionRecord,
+  OfferReportsResponse,
   Page,
   ReportSummary,
   TimeseriesPoint,
@@ -34,12 +35,43 @@ export interface ConversionListParams {
   limit?: number;
 }
 
+export interface OfferReportParams {
+  from?: string;
+  to?: string;
+  offer_ids?: string[];   // serialised as a comma-separated string
+}
+
 export const reportsApi = {
   summary(params: ReportParams = {}) {
     return api<ReportSummary>('/api/reports/summary', { query: params });
   },
   timeseries(params: ReportParams = {}) {
     return api<{ points: TimeseriesPoint[] }>('/api/reports/timeseries', { query: params });
+  },
+  offers(params: OfferReportParams = {}) {
+    return api<OfferReportsResponse>('/api/reports/offers', {
+      query: {
+        from: params.from,
+        to: params.to,
+        offer_ids: params.offer_ids && params.offer_ids.length > 0
+          ? params.offer_ids.join(',')
+          : undefined,
+      },
+    });
+  },
+  backfillOffers(params: { from?: string; to?: string } = {}) {
+    return api<{
+      ok: true;
+      from: string;
+      to: string;
+      clicks_scanned: number;
+      conversions_scanned: number;
+      buckets_written: number;
+      duration_ms: number;
+    }>('/api/reports/offers/backfill', {
+      method: 'POST',
+      body: { from: params.from, to: params.to },
+    });
   },
 };
 

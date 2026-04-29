@@ -10,11 +10,13 @@ import { ActivityChart, RevenueChart } from './ReportChart';
 import { ClicksReportTab } from './ClicksReportTab';
 import { ConversionsReportTab } from './ConversionsReportTab';
 import { PostbacksReportTab } from './PostbacksReportTab';
+import { OfferReportsTab } from './OfferReportsTab';
 import { cn } from '@/lib/cn';
 
-type Tab = 'clicks' | 'conversions' | 'postbacks';
+type Tab = 'offers' | 'clicks' | 'conversions' | 'postbacks';
 
 const TABS: { key: Tab; label: string; description: string }[] = [
+  { key: 'offers',      label: 'Offer reports', description: 'Aggregated metrics, trends and month-end forecast per offer.' },
   { key: 'clicks',      label: 'Clicks',      description: 'Every tracked click.' },
   { key: 'conversions', label: 'Conversions', description: 'Verified postbacks that resolved to a real click.' },
   { key: 'postbacks',   label: 'Postbacks',   description: 'All postback events (verified + unverified).' },
@@ -26,7 +28,7 @@ function defaultRange(): ReportRange {
 
 export function ReportsPage() {
   const [range, setRange] = useState<ReportRange>(defaultRange);
-  const [tab, setTab] = useState<Tab>('clicks');
+  const [tab, setTab] = useState<Tab>('offers');
 
   const queryArgs = useMemo(
     () => ({ from: range.from, to: range.to }),
@@ -149,6 +151,7 @@ export function ReportsPage() {
           ))}
         </div>
         <div>
+          {tab === 'offers' && <OfferReportsTab range={range} />}
           {tab === 'clicks' && <ClicksReportTab range={range} />}
           {tab === 'conversions' && <ConversionsReportTab range={range} verifiedOnly />}
           {tab === 'postbacks' && <PostbacksReportTab range={range} />}
