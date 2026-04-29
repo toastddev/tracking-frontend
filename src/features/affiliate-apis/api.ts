@@ -64,6 +64,9 @@ export const affiliateApisApi = {
   runNow(id: string) {
     return api<{ ok: true; run_id: string }>(`/api/affiliate-apis/${encodeURIComponent(id)}/run`, { method: 'POST' });
   },
+  forceUnlock(id: string) {
+    return api<{ ok: true }>(`/api/affiliate-apis/${encodeURIComponent(id)}/unlock`, { method: 'POST' });
+  },
   testRun(id: string) {
     return api<{ ok: true; run: AffiliateApiRunRecord }>(`/api/affiliate-apis/${encodeURIComponent(id)}/test`, { method: 'POST' });
   },

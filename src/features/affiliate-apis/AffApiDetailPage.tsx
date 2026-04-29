@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Pencil, Play, RefreshCw, TestTube2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Play, RefreshCw, TestTube2, Trash2, Unlock } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -75,6 +75,19 @@ export function AffApiDetailPage() {
       qc.invalidateQueries({ queryKey: ['affiliate-apis'] });
       qc.removeQueries({ queryKey: ['affiliate-api', id] });
       navigate('/aff-api', { replace: true });
+    },
+  });
+
+  const forceUnlock = useMutation({
+    mutationFn: () => affiliateApisApi.forceUnlock(id),
+    onSuccess: () => {
+      setActionError(null);
+      qc.invalidateQueries({ queryKey: ['affiliate-api', id] });
+      qc.invalidateQueries({ queryKey: ['affiliate-api-runs', id] });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError) setActionError(err.code ?? err.message);
+      else if (err instanceof Error) setActionError(err.message);
     },
   });
 
@@ -173,8 +186,19 @@ export function AffApiDetailPage() {
       </div>
 
       {actionError && (
-        <div className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
-          {actionError}
+        <div className="mt-4 flex items-center gap-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
+          <span className="flex-1">{actionError}</span>
+          {actionError.includes('already in progress') && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => forceUnlock.mutate()}
+              disabled={forceUnlock.isPending}
+              className="shrink-0"
+            >
+              <Unlock className="h-4 w-4" /> {forceUnlock.isPending ? 'Unlocking…' : 'Force unlock'}
+            </Button>
+          )}
         </div>
       )}
 
