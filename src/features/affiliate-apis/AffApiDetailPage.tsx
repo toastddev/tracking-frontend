@@ -45,7 +45,14 @@ export function AffApiDetailPage() {
       qc.invalidateQueries({ queryKey: ['affiliate-api', id] });
     },
     onError: (err) => {
-      if (err instanceof ApiError) setActionError(err.code === 'locked' ? 'A run is already in progress.' : err.code ?? err.message);
+      if (err instanceof ApiError) {
+        const msg = err.code === 'locked'
+          ? 'A run is already in progress.'
+          : err.code === 'run_failed'
+            ? 'Run failed — check Cloud Run logs for details.'
+            : err.code ?? err.message;
+        setActionError(msg);
+      }
       else if (err instanceof Error) setActionError(err.message);
     },
   });
