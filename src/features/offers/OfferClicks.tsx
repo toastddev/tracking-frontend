@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Inbox } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
@@ -6,7 +7,6 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/Table';
 import { Pagination } from '@/components/ui/Pagination';
 import { Spinner, CenteredSpinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
 import { fmtDateTime, shortId } from '@/lib/format';
 import { offersApi } from './api';
@@ -78,27 +78,50 @@ export function OfferClicks({ offerId }: Props) {
                 <TH>Time</TH>
                 <TH>Click ID</TH>
                 <TH>Affiliate ID</TH>
+                <TH>Tracking</TH>
                 <TH>IP</TH>
                 <TH>Country</TH>
               </TR>
             </THead>
             <TBody>
-              {query.data?.items.map((c) => (
-                <TR
-                  key={c.click_id}
-                  className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50"
-                >
-                  <TD className="whitespace-nowrap text-xs text-slate-600 dark:text-neutral-400">{fmtDateTime(c.created_at)}</TD>
-                  <TD>
-                    <code className="font-mono text-xs text-slate-700 dark:text-neutral-300">{shortId(c.click_id, 12)}</code>
-                  </TD>
-                  <TD>
-                    <span className="text-sm font-medium">{c.aff_id}</span>
-                  </TD>
-                  <TD className="text-xs text-slate-500 dark:text-neutral-400">{c.ip ?? '—'}</TD>
-                  <TD className="text-xs text-slate-500 dark:text-neutral-400">{c.country ?? '—'}</TD>
-                </TR>
-              ))}
+              {query.data?.items.map((c) => {
+                const adIdKeys = Object.keys(c.ad_ids ?? {}).filter((k) => c.ad_ids?.[k]);
+                const subCount = Object.keys(c.sub_params ?? {}).length;
+                const extraCount = Object.keys(c.extra_params ?? {}).length;
+                return (
+                  <TR
+                    key={c.click_id}
+                    className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50"
+                  >
+                    <TD className="whitespace-nowrap text-xs text-slate-600 dark:text-neutral-400">{fmtDateTime(c.created_at)}</TD>
+                    <TD>
+                      <Link
+                        to={`/clicks/${encodeURIComponent(c.click_id)}`}
+                        className="font-mono text-xs text-brand-600 hover:underline dark:text-brand-400"
+                      >
+                        {shortId(c.click_id, 12)}
+                      </Link>
+                    </TD>
+                    <TD>
+                      <span className="text-sm font-medium">{c.aff_id}</span>
+                    </TD>
+                    <TD>
+                      <div className="flex flex-wrap gap-1">
+                        {adIdKeys.map((k) => (
+                          <Badge key={k} tone="blue" className="text-[10px]">{k}</Badge>
+                        ))}
+                        {subCount > 0 && <Badge tone="gray" className="text-[10px]">{subCount} sub</Badge>}
+                        {extraCount > 0 && <Badge tone="gray" className="text-[10px]">{extraCount} extra</Badge>}
+                        {adIdKeys.length === 0 && subCount === 0 && extraCount === 0 && (
+                          <span className="text-xs text-slate-400 dark:text-neutral-500">—</span>
+                        )}
+                      </div>
+                    </TD>
+                    <TD className="text-xs text-slate-500 dark:text-neutral-400">{c.ip ?? '—'}</TD>
+                    <TD className="text-xs text-slate-500 dark:text-neutral-400">{c.country ?? '—'}</TD>
+                  </TR>
+                );
+              })}
             </TBody>
           </Table>
           <Pagination

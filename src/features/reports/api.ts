@@ -56,6 +56,11 @@ export const clicksApi = {
       },
     });
   },
+  get(id: string) {
+    return api<{ click: ClickRecord; conversions: ConversionRecord[] }>(
+      `/api/clicks/${encodeURIComponent(id)}`
+    );
+  },
 };
 
 export const allConversionsApi = {

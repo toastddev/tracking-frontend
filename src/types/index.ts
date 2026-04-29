@@ -45,6 +45,7 @@ export interface ClickRecord {
   aff_id: string;
   sub_params: Record<string, string>;
   ad_ids: AdIds;
+  extra_params?: Record<string, string>;
   ip?: string;
   user_agent?: string;
   referrer?: string;
@@ -54,6 +55,7 @@ export interface ClickRecord {
 }
 
 export type VerificationReason = 'click_found' | 'unknown_click_id';
+export type ConversionSource = 'postback' | 'api';
 
 export interface ConversionRecord {
   conversion_id: string;
@@ -65,11 +67,15 @@ export interface ConversionRecord {
   status?: string;
   txn_id?: string;
   network_timestamp?: string;
-  raw_payload: Record<string, string>;
+  raw_payload: Record<string, unknown>;
   source_ip?: string;
   method: 'GET' | 'POST';
   verified: boolean;
   verification_reason: VerificationReason;
+  source?: ConversionSource;
+  shadow?: boolean;
+  aff_api_id?: string;
+  external_id?: string;
   created_at: string;
 }
 
