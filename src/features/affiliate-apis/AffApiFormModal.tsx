@@ -260,8 +260,8 @@ export function AffApiFormModal({ open, onClose, initial }: Props) {
       }
       if (!form.name.trim()) throw new Error('Name is required');
       if (!form.base_url.trim()) throw new Error('Base URL is required');
-      if (!form.m_items.trim() || !form.m_external_id.trim() || !form.m_click_id.trim()) {
-        throw new Error('Mapping needs items, external_id and click_id paths');
+      if (!form.m_external_id.trim() || !form.m_click_id.trim()) {
+        throw new Error('Mapping needs external_id and click_id paths');
       }
       const payload = buildPayload();
       if (editing) return affiliateApisApi.update(initial!.api_id, payload);
@@ -544,7 +544,10 @@ export function AffApiFormModal({ open, onClose, initial }: Props) {
         {/* Mapping */}
         <Section title="Response → Conversion mapping">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Items path *"><Input value={form.m_items} onChange={(e) => patch('m_items', e.target.value)} placeholder="data.conversions" /></Field>
+            <Field label="Items path">
+              <Input value={form.m_items} onChange={(e) => patch('m_items', e.target.value)} placeholder="data.conversions" />
+              <p className="hint">Leave blank if the API returns a root-level JSON array (e.g. Kelkoo).</p>
+            </Field>
             <Field label="External ID path *"><Input value={form.m_external_id} onChange={(e) => patch('m_external_id', e.target.value)} placeholder="id" /></Field>
             <Field label="Click ID path *"><Input value={form.m_click_id} onChange={(e) => patch('m_click_id', e.target.value)} placeholder="click_id" /></Field>
             <Field label="Payout path"><Input value={form.m_payout} onChange={(e) => patch('m_payout', e.target.value)} placeholder="payout" /></Field>
