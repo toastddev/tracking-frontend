@@ -148,6 +148,160 @@ export interface OfferReportsResponse {
   };
 }
 
+// ── Single-offer drill-down (per-offer detail page) ──────────────────
+export interface OfferDetailDailyPoint {
+  date: string;
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+}
+
+export interface OfferDetailSummary {
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+  cvr: number;
+  epc: number;
+  rpm: number;
+  avg_payout: number;
+  approval_rate: number;
+}
+
+export interface OfferDetailDeltas {
+  revenue_pct: number | null;
+  clicks_pct: number | null;
+  conversions_pct: number | null;
+  cvr_abs: number | null;
+  epc_pct: number | null;
+  approval_rate_abs: number | null;
+}
+
+export interface AffiliateBreakdown {
+  aff_id: string;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  cvr: number;
+  epc: number;
+}
+
+export interface CountryBreakdown {
+  country: string;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  cvr: number;
+}
+
+export interface SubIdBreakdown {
+  value: string;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  cvr: number;
+}
+
+export interface NetworkBreakdown {
+  network_id: string;
+  conversions: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+  approval_rate: number;
+}
+
+export type AdPlatform = 'google' | 'facebook' | 'tiktok' | 'microsoft' | 'organic';
+
+export interface AdPlatformBreakdown {
+  platform: AdPlatform;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  cvr: number;
+}
+
+export type HourHeatmap = number[][]; // [day_of_week 0=Sun][hour 0-23]
+
+export interface PayoutBucket {
+  label: string;
+  count: number;
+  revenue: number;
+}
+
+export type FlagSeverity = 'info' | 'warn' | 'critical';
+
+export interface OfferDetailFlag {
+  severity: FlagSeverity;
+  title: string;
+  detail: string;
+}
+
+export interface OfferDetailRecentConversion {
+  conversion_id: string;
+  network_id: string;
+  status?: string;
+  payout?: number;
+  currency?: string;
+  verified: boolean;
+  created_at: string;
+  click_id: string;
+}
+
+export interface OfferDetailResponse {
+  offer: {
+    offer_id: string;
+    name?: string;
+    status?: Status;
+    base_url?: string;
+    created_at?: string;
+    updated_at?: string;
+  };
+  range: { from: string; to: string; days: number };
+  previous_range: { from: string; to: string };
+
+  summary: OfferDetailSummary;
+  previous: OfferDetailSummary;
+  deltas: OfferDetailDeltas;
+
+  series: OfferDetailDailyPoint[];
+  funnel: { clicks: number; postbacks: number; verified: number; approved: number };
+
+  breakdowns: {
+    affiliates: AffiliateBreakdown[];
+    countries: CountryBreakdown[];
+    sub_ids: { s1: SubIdBreakdown[]; s2: SubIdBreakdown[] };
+    networks: NetworkBreakdown[];
+    ad_platforms: AdPlatformBreakdown[];
+    hour_heatmap: HourHeatmap;
+  };
+
+  payout_histogram: PayoutBucket[];
+  flags: OfferDetailFlag[];
+  samples: {
+    clicks_sampled: number;
+    conversions_sampled: number;
+    clicks_truncated: boolean;
+    conversions_truncated: boolean;
+  };
+
+  recent: {
+    rejected: OfferDetailRecentConversion[];
+    unverified: OfferDetailRecentConversion[];
+  };
+}
+
 // ── Affiliate API types ───────────────────────────────────────────────
 export type AffiliateApiKind = 'rest' | 'graphql';
 export type AffiliateApiResponseFormat = 'json' | 'xml' | 'auto';

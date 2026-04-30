@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Bar,
@@ -12,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Inbox, Check, X, Database, AlertCircle } from 'lucide-react';
+import { Inbox, Check, X, Database, AlertCircle, ChevronRight } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
@@ -97,6 +98,7 @@ export function OfferReportsTab({ range }: Props) {
   const [search, setSearch] = useState('');
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null);
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   // Persist on every change — debounce isn't worth it; this is a small array.
   useEffect(() => {
@@ -340,11 +342,19 @@ export function OfferReportsTab({ range }: Props) {
                 <SortHeader label={SORT_LABEL.revenue}     active={sortKey==='revenue'}     dir={sortDir} onClick={() => toggleSort('revenue')} align="right" />
                 <SortHeader label={SORT_LABEL.forecast}    active={sortKey==='forecast'}    dir={sortDir} onClick={() => toggleSort('forecast')} align="right" />
                 <TH>Trend</TH>
+                <TH className="w-8" aria-label="Open detail" />
               </TR>
             </THead>
             <TBody>
               {sorted.map((row) => (
-                <OfferRow key={row.offer_id} row={row} />
+                <OfferRow
+                  key={row.offer_id}
+                  row={row}
+                  onOpen={() => navigate(
+                    `/reports/offers/${encodeURIComponent(row.offer_id)}` +
+                    `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`
+                  )}
+                />
               ))}
             </TBody>
           </Table>
@@ -354,11 +364,23 @@ export function OfferReportsTab({ range }: Props) {
   );
 }
 
-function OfferRow({ row }: { row: OfferReportSummary }) {
+function OfferRow({ row, onOpen }: { row: OfferReportSummary; onOpen: () => void }) {
   const { resolved } = useTheme();
   const color = colorForOffer(row.offer_id, resolved === 'dark');
   return (
-    <TR className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50">
+    <TR
+      className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-neutral-800/50"
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`Open detailed report for ${row.offer_name ?? row.offer_id}`}
+    >
       <TD>
         <div className="flex items-center gap-2">
           <span
@@ -424,6 +446,9 @@ function OfferRow({ row }: { row: OfferReportSummary }) {
       </TD>
       <TD>
         <Sparkline series={row.series} color={color} />
+      </TD>
+      <TD className="text-right">
+        <ChevronRight className="h-4 w-4 text-slate-400 dark:text-neutral-500" aria-hidden />
       </TD>
     </TR>
   );

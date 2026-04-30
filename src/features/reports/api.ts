@@ -2,6 +2,7 @@ import { api } from '@/lib/api';
 import type {
   ClickRecord,
   ConversionRecord,
+  OfferDetailResponse,
   OfferReportsResponse,
   Page,
   ReportSummary,
@@ -58,6 +59,12 @@ export const reportsApi = {
           : undefined,
       },
     });
+  },
+  offerDetail(offer_id: string, params: { from?: string; to?: string } = {}) {
+    return api<OfferDetailResponse>(
+      `/api/reports/offers/${encodeURIComponent(offer_id)}/detail`,
+      { query: { from: params.from, to: params.to } }
+    );
   },
   backfillOffers(params: { from?: string; to?: string } = {}) {
     return api<{
