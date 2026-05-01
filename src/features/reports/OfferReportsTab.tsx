@@ -308,7 +308,7 @@ export function OfferReportsTab({ range }: Props) {
           <CardBody className="p-0">
             {sorted.length === 0
               ? <EmptyState icon={<Inbox className="h-8 w-8" />} title="No data" description="" />
-              : <ClicksVsConvChart offers={sorted.slice(0, 5)} />}
+              : <ClicksVsConvChart offers={sorted} />}
           </CardBody>
         </Card>
 
@@ -594,12 +594,20 @@ function RevenueByOfferChart({ offers }: { offers: OfferReportSummary[] }) {
   const data = useMemo(() => {
     return dates.map((date, i) => {
       const row: Record<string, string | number> = { date };
-      for (const o of visible) {
-        row[o.offer_id] = o.series[i]?.revenue ?? 0;
+      let otherRevenue = 0;
+      for (const o of offers) {
+        if (visible.includes(o)) {
+          row[o.offer_id] = o.series[i]?.revenue ?? 0;
+        } else {
+          otherRevenue += o.series[i]?.revenue ?? 0;
+        }
+      }
+      if (offers.length > 8) {
+        row['other'] = otherRevenue;
       }
       return row;
     });
-  }, [dates, visible]);
+  }, [dates, visible, offers]);
 
   const grid = dark ? '#262626' : '#e2e8f0';
   const axis = dark ? '#a3a3a3' : '#64748b';
@@ -640,18 +648,33 @@ function RevenueByOfferChart({ offers }: { offers: OfferReportSummary[] }) {
           />
           <Legend
             wrapperStyle={{ fontSize: 12, color: axis }}
-            formatter={(value) => visible.find((o) => o.offer_id === value)?.offer_name ?? value}
+            formatter={(value) => {
+              if (value === 'other') return 'Other offers';
+              return visible.find((o) => o.offer_id === value)?.offer_name ?? value;
+            }}
             iconType="circle"
           />
-          {visible.map((o) => (
+          {visible.map((o, idx) => {
+            const isTopBar = offers.length <= 8 && idx === visible.length - 1;
+            return (
+              <Bar
+                key={o.offer_id}
+                dataKey={o.offer_id}
+                stackId="rev"
+                fill={colorForOffer(o.offer_id, dark)}
+                radius={isTopBar ? [2, 2, 0, 0] : [0, 0, 0, 0]}
+              />
+            );
+          })}
+          {offers.length > 8 && (
             <Bar
-              key={o.offer_id}
-              dataKey={o.offer_id}
+              dataKey="other"
+              name="Other offers"
               stackId="rev"
-              fill={colorForOffer(o.offer_id, dark)}
+              fill={dark ? '#525252' : '#cbd5e1'}
               radius={[2, 2, 0, 0]}
             />
-          ))}
+          )}
         </BarChart>
       </ResponsiveContainer>
     </div>
