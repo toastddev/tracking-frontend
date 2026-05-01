@@ -13,6 +13,7 @@ import { AffApiListPage } from '@/features/affiliate-apis/AffApiListPage';
 import { AffApiDetailPage } from '@/features/affiliate-apis/AffApiDetailPage';
 import { ClickDetailPage } from '@/features/reports/ClickDetailPage';
 import { OfferReportDetailPage } from '@/features/reports/OfferReportDetailPage';
+import { PostbackReportDetailPage } from '@/features/reports/PostbackReportDetailPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
         <Route index element={<Navigate to="/reports" replace />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/reports/offers/:id" element={<OfferReportDetailPage />} />
+        <Route path="/reports/postbacks/:id" element={<PostbackReportDetailPage />} />
         <Route path="/clicks/:id" element={<ClickDetailPage />} />
         <Route path="/offers" element={<OffersListPage />} />
         <Route path="/offers/:id" element={<OfferDetailPage />} />

@@ -302,6 +302,208 @@ export interface OfferDetailResponse {
   };
 }
 
+// ── Per-network postback reports ─────────────────────────────────────
+export interface PostbackDailyPoint {
+  date: string;
+  postbacks: number;
+  verified: number;
+  unverified: number;
+  revenue: number;
+}
+
+export interface PostbackNetworkSummary {
+  network_id: string;
+  network_name?: string;
+  status?: Status;
+  postbacks: number;
+  verified: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+  match_rate: number;
+  approval_rate: number;
+  avg_payout: number;
+  unique_offers: number;
+  series: PostbackDailyPoint[];
+}
+
+export interface PostbackReportsResponse {
+  from: string;
+  to: string;
+  networks: PostbackNetworkSummary[];
+  totals: {
+    postbacks: number;
+    verified: number;
+    unverified: number;
+    revenue: number;
+    networks: number;
+  };
+  truncated: boolean;
+  conversions_scanned: number;
+}
+
+// ── Single-network postback drill-down ───────────────────────────────
+export interface PostbackDetailDailyPoint {
+  date: string;
+  postbacks: number;
+  verified: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+}
+
+export interface PostbackDetailSummary {
+  postbacks: number;
+  verified: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+  avg_payout: number;
+  match_rate: number;
+  approval_rate: number;
+  unique_offers: number;
+  unique_click_ids: number;
+  duplicate_click_ids: number;
+}
+
+export interface PostbackDetailDeltas {
+  postbacks_pct: number | null;
+  verified_pct: number | null;
+  match_rate_abs: number | null;
+  approval_rate_abs: number | null;
+  revenue_pct: number | null;
+}
+
+export interface PostbackOfferBreakdown {
+  offer_id: string;
+  postbacks: number;
+  verified: number;
+  unverified: number;
+  approved: number;
+  rejected: number;
+  revenue: number;
+  match_rate: number;
+}
+
+export interface PostbackSourceBreakdown {
+  source: 'postback' | 'api' | 'unknown';
+  postbacks: number;
+  verified: number;
+  match_rate: number;
+}
+
+export interface PostbackMethodBreakdown {
+  method: 'GET' | 'POST';
+  postbacks: number;
+  verified: number;
+}
+
+export interface PostbackStatusBreakdown {
+  status: 'approved' | 'pending' | 'rejected';
+  count: number;
+  revenue: number;
+  share: number;
+}
+
+export type PostbackHourHeatmap = number[][];
+
+export interface PostbackDetailFlag {
+  severity: FlagSeverity;
+  title: string;
+  detail: string;
+}
+
+export interface PostbackLatency {
+  count: number;
+  p50_minutes: number | null;
+  p95_minutes: number | null;
+  median_minutes: number | null;
+}
+
+export interface PostbackMappingHealth {
+  has_payout_mapping: boolean;
+  has_status_mapping: boolean;
+  has_currency_mapping: boolean;
+  has_txn_id_mapping: boolean;
+  has_timestamp_mapping: boolean;
+  fires_with_payout: number;
+  fires_with_status: number;
+  fires_with_txn_id: number;
+}
+
+export interface UnmatchedSample {
+  conversion_id: string;
+  created_at: string;
+  click_id: string;
+  status?: string;
+  payout?: number;
+  currency?: string;
+  source?: 'postback' | 'api';
+  method?: 'GET' | 'POST';
+  raw_payload_keys: string[];
+}
+
+export interface RecentVerifiedSample {
+  conversion_id: string;
+  created_at: string;
+  offer_id?: string;
+  status?: string;
+  payout?: number;
+  currency?: string;
+  source?: 'postback' | 'api';
+  method?: 'GET' | 'POST';
+  click_id: string;
+}
+
+export interface PostbackDetailResponse {
+  network: {
+    network_id: string;
+    name?: string;
+    status?: Status;
+    mapping_click_id?: string;
+    default_status?: string;
+    has_postback_api?: boolean;
+    created_at?: string;
+    updated_at?: string;
+  };
+  range: { from: string; to: string; days: number };
+  previous_range: { from: string; to: string };
+
+  summary: PostbackDetailSummary;
+  previous: PostbackDetailSummary;
+  deltas: PostbackDetailDeltas;
+
+  series: PostbackDetailDailyPoint[];
+
+  breakdowns: {
+    offers: PostbackOfferBreakdown[];
+    sources: PostbackSourceBreakdown[];
+    methods: PostbackMethodBreakdown[];
+    statuses: PostbackStatusBreakdown[];
+    hour_heatmap: PostbackHourHeatmap;
+  };
+
+  latency: PostbackLatency;
+  mapping_health: PostbackMappingHealth;
+
+  flags: PostbackDetailFlag[];
+  samples: {
+    conversions_sampled: number;
+    truncated: boolean;
+  };
+
+  recent: {
+    verified: RecentVerifiedSample[];
+    unmatched: UnmatchedSample[];
+  };
+}
+
 // ── Affiliate API types ───────────────────────────────────────────────
 export type AffiliateApiKind = 'rest' | 'graphql';
 export type AffiliateApiResponseFormat = 'json' | 'xml' | 'auto';

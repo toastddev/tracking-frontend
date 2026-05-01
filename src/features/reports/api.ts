@@ -5,6 +5,8 @@ import type {
   OfferDetailResponse,
   OfferReportsResponse,
   Page,
+  PostbackDetailResponse,
+  PostbackReportsResponse,
   ReportSummary,
   TimeseriesPoint,
 } from '@/types';
@@ -42,6 +44,12 @@ export interface OfferReportParams {
   offer_ids?: string[];   // serialised as a comma-separated string
 }
 
+export interface PostbackReportParams {
+  from?: string;
+  to?: string;
+  network_ids?: string[];
+}
+
 export const reportsApi = {
   summary(params: ReportParams = {}) {
     return api<ReportSummary>('/api/reports/summary', { query: params });
@@ -63,6 +71,23 @@ export const reportsApi = {
   offerDetail(offer_id: string, params: { from?: string; to?: string } = {}) {
     return api<OfferDetailResponse>(
       `/api/reports/offers/${encodeURIComponent(offer_id)}/detail`,
+      { query: { from: params.from, to: params.to } }
+    );
+  },
+  postbacks(params: PostbackReportParams = {}) {
+    return api<PostbackReportsResponse>('/api/reports/postbacks', {
+      query: {
+        from: params.from,
+        to: params.to,
+        network_ids: params.network_ids && params.network_ids.length > 0
+          ? params.network_ids.join(',')
+          : undefined,
+      },
+    });
+  },
+  postbackDetail(network_id: string, params: { from?: string; to?: string } = {}) {
+    return api<PostbackDetailResponse>(
+      `/api/reports/postbacks/${encodeURIComponent(network_id)}/detail`,
       { query: { from: params.from, to: params.to } }
     );
   },
