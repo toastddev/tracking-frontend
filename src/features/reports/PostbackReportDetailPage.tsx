@@ -58,6 +58,7 @@ import type {
 } from '@/types';
 import { reportsApi } from './api';
 import { buildPresetRange, type ReportRange } from './ReportFilters';
+import { ConversionsReportTab } from './ConversionsReportTab';
 
 const fmtCount = (v: number) =>
   new Intl.NumberFormat(undefined, {
@@ -163,13 +164,13 @@ export function PostbackReportDetailPage() {
           </div>
         </Card>
       ) : (
-        <DetailBody data={detailQuery.data} />
+        <DetailBody data={detailQuery.data} range={range} />
       )}
     </>
   );
 }
 
-function DetailBody({ data }: { data: PostbackDetailResponse }) {
+function DetailBody({ data, range }: { data: PostbackDetailResponse; range: ReportRange }) {
   return (
     <div className="space-y-6">
       <FlagsList flags={data.flags} />
@@ -216,6 +217,14 @@ function DetailBody({ data }: { data: PostbackDetailResponse }) {
       )}
 
       <NetworkMetaCard network={data.network} />
+
+      <Card>
+        <CardHeader
+          title="Raw Postback Log"
+          subtitle={`Chronological log of every postback fire received for ${data.network.name}.`}
+        />
+        <ConversionsReportTab range={range} verifiedOnly={false} fixedNetworkId={data.network.network_id} />
+      </Card>
     </div>
   );
 }

@@ -19,14 +19,16 @@ interface Props {
   range: ReportRange;
   /** When true, the tab only shows verified conversions (Conversions tab). */
   verifiedOnly?: boolean;
+  /** When provided, locks the report to a specific network and hides the network filter. */
+  fixedNetworkId?: string;
 }
 
-export function ConversionsReportTab({ range, verifiedOnly }: Props) {
+export function ConversionsReportTab({ range, verifiedOnly, fixedNetworkId }: Props) {
   const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
   const [offerId, setOfferId] = useState('');
   const [networkId, setNetworkId] = useState('');
   const [appliedOfferId, setAppliedOfferId] = useState('');
-  const [appliedNetworkId, setAppliedNetworkId] = useState('');
+  const [appliedNetworkId, setAppliedNetworkId] = useState(fixedNetworkId ?? '');
   const [openConversionId, setOpenConversionId] = useState<string | null>(null);
 
   const cursor = cursorStack[cursorStack.length - 1] ?? null;
@@ -47,7 +49,9 @@ export function ConversionsReportTab({ range, verifiedOnly }: Props) {
 
   function applyFilters() {
     setAppliedOfferId(offerId.trim());
-    setAppliedNetworkId(networkId.trim());
+    if (!fixedNetworkId) {
+      setAppliedNetworkId(networkId.trim());
+    }
     setCursorStack([null]);
   }
 
@@ -63,26 +67,30 @@ export function ConversionsReportTab({ range, verifiedOnly }: Props) {
             placeholder="e.g. summer_deal"
           />
         </div>
-        <div className="min-w-[10rem] flex-1">
-          <label className="label mb-1 text-xs">Network ID</label>
-          <Input
-            value={networkId}
-            onChange={(e) => setNetworkId(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-            placeholder="e.g. kelkoo"
-          />
-        </div>
+        {!fixedNetworkId && (
+          <div className="min-w-[10rem] flex-1">
+            <label className="label mb-1 text-xs">Network ID</label>
+            <Input
+              value={networkId}
+              onChange={(e) => setNetworkId(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+              placeholder="e.g. kelkoo"
+            />
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Button size="sm" variant="secondary" onClick={applyFilters}>Apply</Button>
-          {(appliedOfferId || appliedNetworkId) && (
+          {(appliedOfferId || (!fixedNetworkId && appliedNetworkId)) && (
             <Button
               size="sm"
               variant="ghost"
               onClick={() => {
                 setOfferId('');
-                setNetworkId('');
+                if (!fixedNetworkId) {
+                  setNetworkId('');
+                  setAppliedNetworkId('');
+                }
                 setAppliedOfferId('');
-                setAppliedNetworkId('');
                 setCursorStack([null]);
               }}
             >

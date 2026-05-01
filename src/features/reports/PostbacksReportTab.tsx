@@ -28,6 +28,7 @@ import { cn } from '@/lib/cn';
 import type { PostbackNetworkSummary } from '@/types';
 import { reportsApi } from './api';
 import type { ReportRange } from './ReportFilters';
+import { ConversionsReportTab } from './ConversionsReportTab';
 
 type SortKey = 'postbacks' | 'verified' | 'match_rate' | 'approval_rate' | 'revenue' | 'name';
 
@@ -201,6 +202,14 @@ export function PostbacksReportTab({ range }: Props) {
             </Table>
           )}
         </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Raw Postback Log"
+          subtitle="Chronological log of every postback fire received (both verified and unmatched) across all networks."
+        />
+        <ConversionsReportTab range={range} verifiedOnly={false} />
       </Card>
     </div>
   );
