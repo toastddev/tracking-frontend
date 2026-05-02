@@ -154,6 +154,11 @@ export const reportsApi = {
       conversions_orphan_lookups: number;
       buckets_written: number;
       duration_ms: number;
+      campaign_spends?: Array<{
+        campaign_id: string;
+        campaign_name: string;
+        total_spend: number;
+      }>;
     }>('/api/reports/campaigns/backfill', {
       method: 'POST',
       body: { from: params.from, to: params.to },

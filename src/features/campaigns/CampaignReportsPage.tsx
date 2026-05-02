@@ -11,6 +11,7 @@ import {
   Info,
   Inbox,
   Megaphone,
+  RefreshCw,
   TrendingDown,
   TrendingUp,
   X,
@@ -105,6 +106,16 @@ export function CampaignReportsPage() {
   const backfill = useMutation({
     mutationFn: () => reportsApi.backfillCampaigns({ from: range.from, to: range.to }),
     onSuccess: (r) => {
+      let spendsText = '';
+      if (r.campaign_spends && r.campaign_spends.length > 0) {
+        const namesAndSpends = r.campaign_spends
+          .slice(0, 5)
+          .map((c) => `${c.campaign_name} (${fmtMoney(c.total_spend)} spend)`)
+          .join(', ');
+        const more = r.campaign_spends.length > 5 ? ` and ${r.campaign_spends.length - 5} more` : '';
+        spendsText = ` Updated spends for: ${namesAndSpends}${more}.`;
+      }
+
       setBackfillMsg({
         tone: 'success',
         text:
@@ -113,7 +124,7 @@ export function CampaignReportsPage() {
           `${r.conversions_scanned.toLocaleString()} conversions ` +
           `(${r.conversions_with_campaign.toLocaleString()} attributed) ` +
           `into ${r.buckets_written.toLocaleString()} campaign-day buckets ` +
-          `(${(r.duration_ms / 1000).toFixed(1)}s).`,
+          `(${(r.duration_ms / 1000).toFixed(1)}s).${spendsText}`,
       });
       qc.invalidateQueries({ queryKey: ['reports', 'campaigns'] });
       qc.invalidateQueries({ queryKey: ['report-campaign-detail'] });
@@ -136,6 +147,16 @@ export function CampaignReportsPage() {
             <Button
               size="sm"
               variant="secondary"
+              onClick={() => qc.invalidateQueries({ queryKey: ['reports'] })}
+              disabled={reportQuery.isFetching}
+              title="Refresh report data"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', reportQuery.isFetching && 'animate-spin')} />
+              Refresh
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={() => { setBackfillMsg(null); backfill.mutate(); }}
               disabled={backfill.isPending}
               title="Rebuild the campaign rollup from your historical clicks + conversions. Idempotent. Operator-entered spend is preserved."
@@ -143,7 +164,6 @@ export function CampaignReportsPage() {
               {backfill.isPending ? <Spinner /> : <Database className="h-3.5 w-3.5" />}
               {backfill.isPending ? 'Rebuilding…' : 'Rebuild from source'}
             </Button>
-            {reportQuery.isFetching && <Spinner className="text-slate-400 dark:text-neutral-500" />}
           </div>
         }
       />

@@ -12,6 +12,7 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  RefreshCw,
   Save,
 } from 'lucide-react';
 import {
@@ -105,6 +106,7 @@ export function CampaignDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const [search] = useSearchParams();
   const range = useMemo(() => rangeFromQuery(search), [search]);
+  const qc = useQueryClient();
 
   const detailQuery = useQuery({
     queryKey: ['report-campaign-detail', id, range.from, range.to],
@@ -132,12 +134,21 @@ export function CampaignDetailPage() {
         }
         actions={
           <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => qc.invalidateQueries({ queryKey: ['report-campaign-detail', id] })}
+              disabled={detailQuery.isFetching}
+              title="Refresh campaign data"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5', detailQuery.isFetching && 'animate-spin')} />
+              Refresh
+            </Button>
             {detailQuery.data?.campaign.source && (
               <Badge tone={detailQuery.data.campaign.source === 'gad_campaignid' ? 'blue' : 'amber'}>
                 {detailQuery.data.campaign.source === 'gad_campaignid' ? 'Google Ads' : 'UTM'}
               </Badge>
             )}
-            {detailQuery.isFetching && <Spinner className="text-slate-400 dark:text-neutral-500" />}
           </div>
         }
       />
