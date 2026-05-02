@@ -591,7 +591,7 @@ export interface AffiliateApi {
 export interface AffiliateApiRunRecord {
   run_id: string;
   api_id: string;
-  status: 'ok' | 'partial' | 'error' | 'running' | 'skipped';
+  status: 'ok' | 'partial' | 'error' | 'running' | 'skipped' | 'gads_upload_error';
   started_at: string;
   finished_at?: string;
   duration_ms?: number;
@@ -606,4 +606,8 @@ export interface AffiliateApiRunRecord {
   window_from?: string;
   window_to?: string;
   triggered_by?: 'schedule' | 'manual';
+  gads_sent?: number;
+  gads_skipped?: number;
+  gads_failed?: number;
+  gads_errors?: string[];
 }

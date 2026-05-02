@@ -244,6 +244,8 @@ export function AffApiDetailPage() {
                 <TH>Unknown click</TH>
                 <TH>Failed</TH>
                 <TH>HTTP</TH>
+                <TH>GAds ✓</TH>
+                <TH>GAds ✗</TH>
                 <TH>Duration</TH>
               </TR>
             </THead>
@@ -252,8 +254,8 @@ export function AffApiDetailPage() {
                 <TR key={r.run_id}>
                   <TD className="text-xs">{fmtDateTime(r.started_at)}</TD>
                   <TD>
-                    <Badge tone={r.status === 'ok' ? 'green' : r.status === 'partial' ? 'amber' : r.status === 'error' ? 'red' : 'gray'}>
-                      {r.status}
+                    <Badge tone={r.status === 'ok' ? 'green' : r.status === 'partial' ? 'amber' : r.status === 'gads_upload_error' ? 'amber' : r.status === 'error' ? 'red' : 'gray'}>
+                      {r.status === 'gads_upload_error' ? 'gads error' : r.status}
                     </Badge>
                   </TD>
                   <TD className="text-xs text-slate-500 dark:text-neutral-400">{r.triggered_by ?? '—'}</TD>
@@ -262,6 +264,8 @@ export function AffApiDetailPage() {
                   <TD className="text-xs text-slate-500 dark:text-neutral-400">{r.records_skipped_unknown_click ?? 0}</TD>
                   <TD className="text-xs text-slate-500 dark:text-neutral-400">{r.records_failed ?? 0}</TD>
                   <TD className="text-xs text-slate-500 dark:text-neutral-400">{r.http_calls ?? 0}</TD>
+                  <TD className="text-xs text-emerald-600 dark:text-emerald-400">{r.gads_sent ?? 0}</TD>
+                  <TD className="text-xs text-red-600 dark:text-red-400">{r.gads_failed ?? 0}</TD>
                   <TD className="text-xs text-slate-500 dark:text-neutral-400">{r.duration_ms != null ? `${r.duration_ms}ms` : '—'}</TD>
                 </TR>
               ))}
@@ -304,15 +308,29 @@ function RunStatsRow({ run }: { run: AffiliateApiRunRecord }) {
     { k: 'Failed', v: run.records_failed ?? 0 },
     { k: 'HTTP calls', v: run.http_calls ?? 0 },
     { k: 'Duration', v: run.duration_ms != null ? `${run.duration_ms}ms` : '—' },
+    { k: 'GAds sent', v: run.gads_sent ?? 0 },
+    { k: 'GAds skipped', v: run.gads_skipped ?? 0 },
+    { k: 'GAds failed', v: run.gads_failed ?? 0 },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {items.map((i) => (
-        <div key={i.k} className="rounded-md bg-slate-50 px-3 py-2 text-sm dark:bg-neutral-950/60">
-          <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-neutral-500">{i.k}</div>
-          <div className="font-medium text-slate-900 dark:text-neutral-100">{i.v}</div>
+    <>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {items.map((i) => (
+          <div key={i.k} className="rounded-md bg-slate-50 px-3 py-2 text-sm dark:bg-neutral-950/60">
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-neutral-500">{i.k}</div>
+            <div className="font-medium text-slate-900 dark:text-neutral-100">{i.v}</div>
+          </div>
+        ))}
+      </div>
+      {run.gads_errors && run.gads_errors.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {run.gads_errors.map((e, i) => (
+            <div key={i} className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/30">
+              {e}
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+      )}
+    </>
   );
 }
