@@ -1,5 +1,7 @@
 import { api } from '@/lib/api';
 import type {
+  CampaignDetailResponse,
+  CampaignReportsResponse,
   ClickRecord,
   ConversionRecord,
   OfferDetailResponse,
@@ -48,6 +50,12 @@ export interface PostbackReportParams {
   from?: string;
   to?: string;
   network_ids?: string[];
+}
+
+export interface CampaignReportParams {
+  from?: string;
+  to?: string;
+  campaign_ids?: string[];
 }
 
 export const reportsApi = {
@@ -101,6 +109,52 @@ export const reportsApi = {
       buckets_written: number;
       duration_ms: number;
     }>('/api/reports/offers/backfill', {
+      method: 'POST',
+      body: { from: params.from, to: params.to },
+    });
+  },
+  campaigns(params: CampaignReportParams = {}) {
+    return api<CampaignReportsResponse>('/api/reports/campaigns', {
+      query: {
+        from: params.from,
+        to: params.to,
+        campaign_ids: params.campaign_ids && params.campaign_ids.length > 0
+          ? params.campaign_ids.join(',')
+          : undefined,
+      },
+    });
+  },
+  campaignDetail(campaign_id: string, params: { from?: string; to?: string } = {}) {
+    return api<CampaignDetailResponse>(
+      `/api/reports/campaigns/${encodeURIComponent(campaign_id)}/detail`,
+      { query: { from: params.from, to: params.to } }
+    );
+  },
+  updateCampaignSpend(campaign_id: string, date: string, spend: number) {
+    return api<{ ok: true; campaign_id: string; date: string; spend: number }>(
+      `/api/reports/campaigns/${encodeURIComponent(campaign_id)}/spend`,
+      { method: 'PATCH', body: { date, spend } }
+    );
+  },
+  updateCampaignName(campaign_id: string, campaign_name: string) {
+    return api<{ ok: true; campaign_id: string; campaign_name: string }>(
+      `/api/reports/campaigns/${encodeURIComponent(campaign_id)}/name`,
+      { method: 'PATCH', body: { campaign_name } }
+    );
+  },
+  backfillCampaigns(params: { from?: string; to?: string } = {}) {
+    return api<{
+      ok: true;
+      from: string;
+      to: string;
+      clicks_scanned: number;
+      clicks_with_campaign: number;
+      conversions_scanned: number;
+      conversions_with_campaign: number;
+      conversions_orphan_lookups: number;
+      buckets_written: number;
+      duration_ms: number;
+    }>('/api/reports/campaigns/backfill', {
       method: 'POST',
       body: { from: params.from, to: params.to },
     });

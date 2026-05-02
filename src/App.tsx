@@ -14,6 +14,8 @@ import { AffApiDetailPage } from '@/features/affiliate-apis/AffApiDetailPage';
 import { ClickDetailPage } from '@/features/reports/ClickDetailPage';
 import { OfferReportDetailPage } from '@/features/reports/OfferReportDetailPage';
 import { PostbackReportDetailPage } from '@/features/reports/PostbackReportDetailPage';
+import { CampaignReportsPage } from '@/features/campaigns/CampaignReportsPage';
+import { CampaignDetailPage } from '@/features/campaigns/CampaignDetailPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 
 export default function App() {
@@ -32,6 +34,8 @@ export default function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/reports/offers/:id" element={<OfferReportDetailPage />} />
         <Route path="/reports/postbacks/:id" element={<PostbackReportDetailPage />} />
+        <Route path="/campaigns" element={<CampaignReportsPage />} />
+        <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
         <Route path="/clicks/:id" element={<ClickDetailPage />} />
         <Route path="/offers" element={<OffersListPage />} />
         <Route path="/offers/:id" element={<OfferDetailPage />} />

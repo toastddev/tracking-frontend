@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BarChart3, LayoutDashboard, Package, Webhook, LogOut, Plug, PlugZap, Settings } from 'lucide-react';
+import { BarChart3, LayoutDashboard, Megaphone, Package, Webhook, LogOut, Plug, PlugZap, Settings } from 'lucide-react';
 import { auth } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from './ThemeToggle';
 
 const items = [
   { to: '/reports',     label: 'Reports',     icon: BarChart3 },
+  { to: '/campaigns',   label: 'Campaigns',   icon: Megaphone },
   { to: '/offers',      label: 'Offers',      icon: Package },
   { to: '/postbacks',   label: 'Postbacks',   icon: Webhook },
   { to: '/aff-api',     label: 'Aff API',     icon: Plug },

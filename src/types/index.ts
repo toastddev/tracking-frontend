@@ -504,6 +504,183 @@ export interface PostbackDetailResponse {
   };
 }
 
+// ── Per-campaign reports (TTL-safe rollup) ───────────────────────────
+export interface CampaignDailyPoint {
+  date: string;
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  revenue: number;
+  spend: number;
+  profit: number;
+}
+
+export interface CampaignReportSummary {
+  campaign_id: string;
+  campaign_name?: string;
+  source: string;            // 'gad_campaignid' | 'utm_campaign'
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+  spend: number;
+  profit: number;
+  cvr: number;
+  epc: number;
+  cpc: number;
+  cpa: number;
+  roas: number;
+  roi: number;
+  approval_rate: number;
+  spend_coverage: number;
+  offers: string[];
+  series: CampaignDailyPoint[];
+}
+
+export interface CampaignInsight {
+  severity: 'info' | 'success' | 'warn' | 'critical';
+  title: string;
+  detail: string;
+  campaign_id?: string;
+}
+
+export interface CampaignReportsResponse {
+  from: string;
+  to: string;
+  campaigns: CampaignReportSummary[];
+  totals: {
+    clicks: number;
+    postbacks: number;
+    conversions: number;
+    unverified: number;
+    revenue: number;
+    spend: number;
+    profit: number;
+    cvr: number;
+    epc: number;
+    roas: number;
+    roi: number;
+    campaigns: number;
+    profitable_campaigns: number;
+    unprofitable_campaigns: number;
+    spend_coverage: number;
+  };
+  insights: CampaignInsight[];
+}
+
+// ── Single-campaign drill-down ───────────────────────────────────────
+export interface CampaignDetailDailyPoint {
+  date: string;
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+  spend: number;
+  profit: number;
+  roas: number;
+}
+
+export interface CampaignDetailSummary {
+  clicks: number;
+  postbacks: number;
+  conversions: number;
+  unverified: number;
+  approved: number;
+  pending: number;
+  rejected: number;
+  revenue: number;
+  spend: number;
+  profit: number;
+  cvr: number;
+  epc: number;
+  cpc: number;
+  cpa: number;
+  roas: number;
+  roi: number;
+  approval_rate: number;
+}
+
+export interface CampaignDetailDeltas {
+  revenue_pct: number | null;
+  spend_pct: number | null;
+  profit_abs: number | null;
+  clicks_pct: number | null;
+  conversions_pct: number | null;
+  cvr_abs: number | null;
+  roas_abs: number | null;
+}
+
+export interface CampaignOfferBreakdown {
+  offer_id: string;
+  offer_name?: string;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  cvr: number;
+  share_of_revenue: number;
+}
+
+export interface CampaignWeekdayBreakdown {
+  dow: number;
+  label: string;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  spend: number;
+  profit: number;
+}
+
+export interface CampaignSpendDay {
+  date: string;
+  spend: number;
+  revenue: number;
+  profit: number;
+}
+
+export interface CampaignDetailFlag {
+  severity: 'info' | 'success' | 'warn' | 'critical';
+  title: string;
+  detail: string;
+}
+
+export interface CampaignDetailResponse {
+  campaign: {
+    campaign_id: string;
+    campaign_name?: string;
+    source: string;
+    first_seen?: string;
+    last_seen?: string;
+  };
+  range: { from: string; to: string; days: number };
+  previous_range: { from: string; to: string };
+  summary: CampaignDetailSummary;
+  previous: CampaignDetailSummary;
+  deltas: CampaignDetailDeltas;
+  series: CampaignDetailDailyPoint[];
+  spend_days: CampaignSpendDay[];
+  breakdowns: {
+    offers: CampaignOfferBreakdown[];
+    weekday: CampaignWeekdayBreakdown[];
+  };
+  flags: CampaignDetailFlag[];
+  samples: {
+    clicks_sampled: number;
+    conversions_sampled: number;
+    clicks_truncated: boolean;
+    conversions_truncated: boolean;
+  };
+  best_day?: { date: string; profit: number; revenue: number; spend: number };
+  worst_day?: { date: string; profit: number; revenue: number; spend: number };
+}
+
 // ── Affiliate API types ───────────────────────────────────────────────
 export type AffiliateApiKind = 'rest' | 'graphql';
 export type AffiliateApiResponseFormat = 'json' | 'xml' | 'auto';
