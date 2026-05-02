@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -39,6 +39,7 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { fmtMoney } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
@@ -53,6 +54,28 @@ import type {
 
 const fmtCount = (v: number) =>
   new Intl.NumberFormat(undefined, { notation: v >= 10_000 ? 'compact' : 'standard' }).format(v);
+
+// All date keys in this codebase are YYYY-MM-DD (UTC). Keep the same
+// representation here so the From/To controls round-trip cleanly with the
+// backend's sync window math.
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function monthStartKey(): string {
+  return todayKey().slice(0, 8) + '01';
+}
+
+function fmtSyncedRelative(iso: string | null): string {
+  if (!iso) return 'never';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 'just now';
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  return `${Math.floor(sec / 86400)}d ago`;
+}
 
 const fmtPct = (v: number) => (v * 100).toFixed(2) + '%';
 
@@ -138,8 +161,48 @@ export function CampaignReportsPage() {
     },
   });
 
+  // Persisted Google Ads sync window. Defaults to (1st of current month → today)
+  // until the operator picks something else; their choice survives across sessions
+  // but resets when the calendar rolls into a new month so a fresh window opens
+  // automatically on the 1st.
+  const syncStateQuery = useQuery({
+    queryKey: ['gads-sync-state'],
+    queryFn: () => reportsApi.getGoogleAdsSyncState(),
+    staleTime: 30_000,
+  });
+
+  const today = todayKey();
+  const currentMonth = today.slice(0, 7);
+  const [syncFrom, setSyncFrom] = useState<string | null>(null);
+  const [syncTo, setSyncTo] = useState<string | null>(null);
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || !syncStateQuery.data) return;
+    hydratedRef.current = true;
+    const savedFrom = syncStateQuery.data.pref_from;
+    const savedTo = syncStateQuery.data.pref_to;
+    setSyncFrom(savedFrom && savedFrom.slice(0, 7) === currentMonth ? savedFrom : monthStartKey());
+    setSyncTo(savedTo && savedTo <= today && savedTo.slice(0, 7) === currentMonth ? savedTo : today);
+  }, [syncStateQuery.data, currentMonth, today]);
+
+  const savePrefs = useMutation({
+    mutationFn: (prefs: { from: string; to: string }) => reportsApi.saveGoogleAdsSyncPrefs(prefs),
+  });
+
+  const handleFromChange = (v: string) => {
+    setSyncFrom(v);
+    if (v && syncTo && v <= syncTo) savePrefs.mutate({ from: v, to: syncTo });
+  };
+  const handleToChange = (v: string) => {
+    setSyncTo(v);
+    if (syncFrom && v && syncFrom <= v) savePrefs.mutate({ from: syncFrom, to: v });
+  };
+
   const syncAds = useMutation({
-    mutationFn: () => reportsApi.syncGoogleAdsCampaigns({ from: range.from, to: range.to }),
+    mutationFn: () => {
+      if (!syncFrom || !syncTo) throw new Error('Sync window not loaded');
+      return reportsApi.syncGoogleAdsCampaigns({ from: syncFrom, to: syncTo });
+    },
     onSuccess: (r) => {
       setBackfillMsg({
         tone: 'success',
@@ -147,6 +210,7 @@ export function CampaignReportsPage() {
       });
       qc.invalidateQueries({ queryKey: ['reports', 'campaigns'] });
       qc.invalidateQueries({ queryKey: ['report-campaign-detail'] });
+      qc.invalidateQueries({ queryKey: ['gads-sync-state'] });
     },
     onError: (e: unknown) => {
       setBackfillMsg({
@@ -183,19 +247,68 @@ export function CampaignReportsPage() {
               {backfill.isPending ? <Spinner /> : <Database className="h-3.5 w-3.5" />}
               {backfill.isPending ? 'Rebuilding…' : 'Rebuild'}
             </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => { setBackfillMsg(null); syncAds.mutate(); }}
-              disabled={syncAds.isPending}
-              title="Pull campaign names and ad spend directly from your connected Google Ads accounts."
-            >
-              {syncAds.isPending ? <Spinner /> : <CloudDownload className="h-3.5 w-3.5" />}
-              {syncAds.isPending ? 'Syncing…' : 'Sync Ads'}
-            </Button>
           </div>
         }
       />
+
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-neutral-800 dark:bg-neutral-900/40">
+        <div className="flex flex-col">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+            Google Ads sync window
+          </span>
+          <span className="text-[11px] text-slate-400 dark:text-neutral-500">
+            Saved globally · resets on the 1st of each month
+          </span>
+        </div>
+        <div className="flex items-end gap-2">
+          <div>
+            <label className="mb-0.5 block text-[11px] text-slate-500 dark:text-neutral-400">From</label>
+            <Input
+              type="date"
+              value={syncFrom ?? ''}
+              onChange={(e) => handleFromChange(e.target.value)}
+              max={syncTo ?? today}
+              disabled={syncFrom == null}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div>
+            <label className="mb-0.5 block text-[11px] text-slate-500 dark:text-neutral-400">To</label>
+            <Input
+              type="date"
+              value={syncTo ?? ''}
+              onChange={(e) => handleToChange(e.target.value)}
+              min={syncFrom ?? undefined}
+              max={today}
+              disabled={syncTo == null}
+              className="h-8 text-xs"
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => { setBackfillMsg(null); syncAds.mutate(); }}
+            disabled={syncAds.isPending || !syncFrom || !syncTo}
+            title="Pull campaign names and ad spend directly from your connected Google Ads accounts for the selected window."
+          >
+            {syncAds.isPending ? <Spinner /> : <CloudDownload className="h-3.5 w-3.5" />}
+            {syncAds.isPending ? 'Syncing…' : 'Sync Ads'}
+          </Button>
+        </div>
+        <div className="ml-auto text-right text-[11px] text-slate-500 dark:text-neutral-400">
+          <div>
+            Last Google Ads sync:{' '}
+            <span className="font-medium text-slate-700 dark:text-neutral-200">
+              {syncStateQuery.data ? fmtSyncedRelative(syncStateQuery.data.last_synced_at) : '…'}
+            </span>
+          </div>
+          {syncStateQuery.data?.last_sync_from && syncStateQuery.data?.last_sync_to && (
+            <div className="text-slate-400 dark:text-neutral-500">
+              window {syncStateQuery.data.last_sync_from} → {syncStateQuery.data.last_sync_to}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div className="mb-6">
         <ReportFilters value={range} onChange={setRange} />

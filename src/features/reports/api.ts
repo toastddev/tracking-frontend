@@ -177,7 +177,25 @@ export const reportsApi = {
       body: { from: params.from, to: params.to },
     });
   },
+  getGoogleAdsSyncState() {
+    return api<GoogleAdsSyncState>('/api/reports/campaigns/google-ads-sync-state');
+  },
+  saveGoogleAdsSyncPrefs(prefs: { from: string; to: string }) {
+    return api<GoogleAdsSyncState>('/api/reports/campaigns/google-ads-sync-state', {
+      method: 'PUT',
+      body: prefs,
+    });
+  },
 };
+
+export interface GoogleAdsSyncState {
+  pref_from: string | null;
+  pref_to: string | null;
+  pref_updated_at: string | null;
+  last_synced_at: string | null;
+  last_sync_from: string | null;
+  last_sync_to: string | null;
+}
 
 export const clicksApi = {
   list(params: ClickListParams = {}) {
