@@ -14,6 +14,7 @@ import {
   RefreshCw,
   TrendingDown,
   TrendingUp,
+  CloudDownload,
   X,
 } from 'lucide-react';
 import {
@@ -137,13 +138,31 @@ export function CampaignReportsPage() {
     },
   });
 
+  const syncAds = useMutation({
+    mutationFn: () => reportsApi.syncGoogleAdsCampaigns({ from: range.from, to: range.to }),
+    onSuccess: (r) => {
+      setBackfillMsg({
+        tone: 'success',
+        text: `Synced ${r.campaigns_updated.toLocaleString()} campaigns with ${fmtMoney(r.total_spend_micros / 1_000_000)} total ad spend from Google Ads in ${(r.duration_ms / 1000).toFixed(1)}s.`,
+      });
+      qc.invalidateQueries({ queryKey: ['reports', 'campaigns'] });
+      qc.invalidateQueries({ queryKey: ['report-campaign-detail'] });
+    },
+    onError: (e: unknown) => {
+      setBackfillMsg({
+        tone: 'error',
+        text: `Google Ads sync failed: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    },
+  });
+
   return (
     <>
       <PageHeader
         title="Campaigns"
         description="Per-campaign performance with ad spend, ROAS and ROI. Campaign IDs come from gad_campaignid (Google Ads) or utm_campaign on the click URL."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               size="sm"
               variant="secondary"
@@ -162,7 +181,17 @@ export function CampaignReportsPage() {
               title="Rebuild the campaign rollup from your historical clicks + conversions. Idempotent. Operator-entered spend is preserved."
             >
               {backfill.isPending ? <Spinner /> : <Database className="h-3.5 w-3.5" />}
-              {backfill.isPending ? 'Rebuilding…' : 'Rebuild from source'}
+              {backfill.isPending ? 'Rebuilding…' : 'Rebuild'}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => { setBackfillMsg(null); syncAds.mutate(); }}
+              disabled={syncAds.isPending}
+              title="Pull campaign names and ad spend directly from your connected Google Ads accounts."
+            >
+              {syncAds.isPending ? <Spinner /> : <CloudDownload className="h-3.5 w-3.5" />}
+              {syncAds.isPending ? 'Syncing…' : 'Sync Ads'}
             </Button>
           </div>
         }

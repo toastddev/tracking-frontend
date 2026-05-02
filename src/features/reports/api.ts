@@ -164,6 +164,19 @@ export const reportsApi = {
       body: { from: params.from, to: params.to },
     });
   },
+  syncGoogleAdsCampaigns(params: { from?: string; to?: string } = {}) {
+    return api<{
+      ok: true;
+      from: string;
+      to: string;
+      campaigns_updated: number;
+      total_spend_micros: number;
+      duration_ms: number;
+    }>('/api/reports/campaigns/google-ads-sync', {
+      method: 'POST',
+      body: { from: params.from, to: params.to },
+    });
+  },
 };
 
 export const clicksApi = {
