@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -20,15 +20,20 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Clock,
+  Filter,
   Info,
   Layers,
   Link2,
   ListChecks,
+  Search,
   Settings2,
   Target,
   Webhook,
+  X,
   XCircle,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
@@ -41,6 +46,7 @@ import { fmtMoney, fmtDateTime } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import type {
+  PostbackAvailableOffer,
   PostbackDetailDailyPoint,
   PostbackDetailDeltas,
   PostbackDetailFlag,
@@ -101,14 +107,38 @@ function rangeFromQuery(qp: URLSearchParams): ReportRange {
   return buildPresetRange('30d');
 }
 
+function offerIdsFromQuery(qp: URLSearchParams): string[] {
+  const raw = qp.get('offer_ids');
+  if (!raw) return [];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
 export function PostbackReportDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const [search] = useSearchParams();
+  const [search, setSearch] = useSearchParams();
   const range = useMemo(() => rangeFromQuery(search), [search]);
+  const selectedOfferIds = useMemo(() => offerIdsFromQuery(search), [search]);
+
+  // Stable, sorted+joined key so query cache hits regardless of selection order.
+  const offerCacheKey = useMemo(
+    () => [...selectedOfferIds].sort().join(','),
+    [selectedOfferIds],
+  );
+
+  function setSelectedOfferIds(next: string[]) {
+    const params = new URLSearchParams(search);
+    if (next.length === 0) params.delete('offer_ids');
+    else params.set('offer_ids', next.join(','));
+    setSearch(params, { replace: true });
+  }
 
   const detailQuery = useQuery({
-    queryKey: ['report-postback-detail', id, range.from, range.to],
-    queryFn: () => reportsApi.postbackDetail(id, { from: range.from, to: range.to }),
+    queryKey: ['report-postback-detail', id, range.from, range.to, offerCacheKey],
+    queryFn: () => reportsApi.postbackDetail(id, {
+      from: range.from,
+      to: range.to,
+      offer_ids: selectedOfferIds.length > 0 ? selectedOfferIds : undefined,
+    }),
     enabled: !!id,
     staleTime: 30_000,
   });
@@ -164,15 +194,53 @@ export function PostbackReportDetailPage() {
           </div>
         </Card>
       ) : (
-        <DetailBody data={detailQuery.data} range={range} />
+        <DetailBody
+          data={detailQuery.data}
+          range={range}
+          selectedOfferIds={selectedOfferIds}
+          onSelectedOfferIdsChange={setSelectedOfferIds}
+        />
       )}
     </>
   );
 }
 
-function DetailBody({ data, range }: { data: PostbackDetailResponse; range: ReportRange }) {
+function DetailBody({
+  data,
+  range,
+  selectedOfferIds,
+  onSelectedOfferIdsChange,
+}: {
+  data: PostbackDetailResponse;
+  range: ReportRange;
+  selectedOfferIds: string[];
+  onSelectedOfferIdsChange: (next: string[]) => void;
+}) {
+  // The filter scopes summary/series/deltas/offer-table only. Cards backed by
+  // network-level dimensions (sources, methods, heatmap, latency, mapping)
+  // stay network-wide — drilldowns don't store those per-offer. The notice
+  // below makes that distinction explicit.
+  const filterActive = data.offer_filter_applied;
+  const networkWideNotice = filterActive ? (
+    <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-600 dark:border-neutral-800 dark:bg-neutral-900/60 dark:text-neutral-400">
+      <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+      <div>
+        These metrics aren't scoped by the offer filter — they aggregate across
+        every offer this network fired for. The drilldown rollup doesn't track
+        them per-offer.
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-6">
+      <OfferFilterBar
+        offers={data.available_offers}
+        selectedOfferIds={selectedOfferIds}
+        onChange={onSelectedOfferIdsChange}
+        range={range}
+      />
+
       <FlagsList flags={data.flags} />
 
       <KpiGrid summary={data.summary} previous={data.previous} deltas={data.deltas} />
@@ -193,9 +261,11 @@ function DetailBody({ data, range }: { data: PostbackDetailResponse; range: Repo
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <OffersFiredTable rows={data.breakdowns.offers} />
+        <OffersFiredTable rows={data.breakdowns.offers} availableOffers={data.available_offers} />
         <StatusBreakdownCard rows={data.breakdowns.statuses} verified={data.summary.verified} />
       </div>
+
+      {networkWideNotice}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SourceMixCard rows={data.breakdowns.sources} />
@@ -221,9 +291,20 @@ function DetailBody({ data, range }: { data: PostbackDetailResponse; range: Repo
       <Card>
         <CardHeader
           title="Raw Postback Log"
-          subtitle={`Chronological log of every postback fire received for ${data.network.name}.`}
+          subtitle={
+            filterActive
+              ? `Every postback fire for ${data.network.name}, scoped to the ${selectedOfferIds.length} selected offer${selectedOfferIds.length === 1 ? '' : 's'}. Use the time-window controls to drill into a specific minute range; click a row for raw payload, or the click_id to inspect the matched click.`
+              : `Every postback fire for ${data.network.name}. Use the time-window controls to drill into a specific minute range; click a row for raw payload, or the click_id to inspect the matched click.`
+          }
         />
-        <ConversionsReportTab range={range} verifiedOnly={false} fixedNetworkId={data.network.network_id} />
+        <ConversionsReportTab
+          range={range}
+          verifiedOnly={false}
+          fixedNetworkId={data.network.network_id}
+          fixedOfferIds={selectedOfferIds.length > 0 ? selectedOfferIds : undefined}
+          inlineDateTimeOverride
+          showClickColumn
+        />
       </Card>
     </div>
   );
@@ -387,9 +468,11 @@ function Kpi({
 // ── Charts ───────────────────────────────────────────────────────────
 
 // Daily postback delivery — verified bars stacked under unverified, with a
-// match-rate line on the right axis. The whole chart is a delivery health
-// thermometer: short bars = network gone quiet; verified shrinking while
-// unverified grows = tracking break.
+// match-rate line and a revenue line on independent right-side axes. The
+// whole chart is a delivery health thermometer: short bars = network gone
+// quiet; verified shrinking while unverified grows = tracking break;
+// revenue line dropping while bars hold steady = network downgrading
+// approvals or paying less per lead.
 function DeliveryChart({ series }: { series: PostbackDetailDailyPoint[] }) {
   const { resolved } = useTheme();
   const dark = resolved === 'dark';
@@ -398,6 +481,7 @@ function DeliveryChart({ series }: { series: PostbackDetailDailyPoint[] }) {
   const verifiedColor = dark ? '#34d399' : '#059669';
   const unverifiedColor = dark ? '#94a3b8' : '#94a3b8';
   const matchColor = dark ? '#fbbf24' : '#d97706';
+  const revenueColor = dark ? '#60a5fa' : '#2563eb';
 
   const data = useMemo(() =>
     series.map((p) => ({
@@ -406,11 +490,21 @@ function DeliveryChart({ series }: { series: PostbackDetailDailyPoint[] }) {
     })),
   [series]);
 
+  // Compact $ formatter for the revenue axis ticks — keeps the axis narrow
+  // even when daily revenue runs into the thousands.
+  const fmtRevTick = (v: number) =>
+    new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: 'USD',
+      notation: Math.abs(v) >= 1000 ? 'compact' : 'standard',
+      maximumFractionDigits: Math.abs(v) >= 1000 ? 1 : 0,
+    }).format(v);
+
   return (
     <Card>
       <CardHeader
         title="Daily delivery"
-        subtitle="Verified (green) and unmatched (grey) fires per day, with match rate (orange) on the right axis. A falling orange line is the earliest signal of a broken click_id mapping."
+        subtitle="Verified (green) and unmatched (grey) fires per day, with match rate (orange) and revenue (blue) on the right axes. A falling orange line is the earliest signal of a broken click_id mapping; a falling blue line with steady bars is the network paying you less."
       />
       <CardBody className="p-0">
         <div className="h-72 w-full px-2 pb-2 pt-3 sm:px-4">
@@ -443,6 +537,15 @@ function DeliveryChart({ series }: { series: PostbackDetailDailyPoint[] }) {
                 domain={[0, 100]}
                 tickFormatter={(v) => `${v}%`}
               />
+              <YAxis
+                yAxisId="rev"
+                orientation="right"
+                tick={{ fill: revenueColor, fontSize: 11 }}
+                stroke={grid}
+                tickLine={false}
+                width={56}
+                tickFormatter={fmtRevTick}
+              />
               <Tooltip
                 contentStyle={{
                   backgroundColor: dark ? '#171717' : '#ffffff',
@@ -454,6 +557,9 @@ function DeliveryChart({ series }: { series: PostbackDetailDailyPoint[] }) {
                 formatter={(value, name) => {
                   if (name === 'Match rate') {
                     return value == null ? ['—', name] : [`${Number(value).toFixed(1)}%`, name];
+                  }
+                  if (name === 'Revenue') {
+                    return [fmtMoney(Number(value)), name];
                   }
                   return [fmtCount(Number(value)), name];
                 }}
@@ -470,6 +576,15 @@ function DeliveryChart({ series }: { series: PostbackDetailDailyPoint[] }) {
                 strokeWidth={2}
                 dot={false}
                 connectNulls
+              />
+              <Line
+                yAxisId="rev"
+                type="monotone"
+                dataKey="revenue"
+                name="Revenue"
+                stroke={revenueColor}
+                strokeWidth={2}
+                dot={false}
               />
             </ComposedChart>
           </ResponsiveContainer>
@@ -606,7 +721,19 @@ function Bar2({
 
 // ── Per-offer fires for this network ──────────────────────────────────
 
-function OffersFiredTable({ rows }: { rows: PostbackOfferBreakdown[] }) {
+function OffersFiredTable({
+  rows,
+  availableOffers,
+}: {
+  rows: PostbackOfferBreakdown[];
+  availableOffers: PostbackAvailableOffer[];
+}) {
+  const nameByOfferId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of availableOffers) if (o.name) m.set(o.offer_id, o.name);
+    return m;
+  }, [availableOffers]);
+
   return (
     <Card>
       <CardHeader
@@ -629,24 +756,238 @@ function OffersFiredTable({ rows }: { rows: PostbackOfferBreakdown[] }) {
               </TR>
             </THead>
             <TBody>
-              {rows.map((r) => (
-                <TR key={r.offer_id}>
-                  <TD className="font-mono text-xs">{r.offer_id}</TD>
-                  <TD className="text-right tabular-nums">{fmtCount(r.postbacks)}</TD>
-                  <TD className="text-right tabular-nums">{fmtCount(r.verified)}</TD>
-                  <TD className="text-right tabular-nums">{r.postbacks > 0 ? fmtPct(r.match_rate) : '—'}</TD>
-                  <TD className="text-right tabular-nums text-xs">
-                    <span className="text-emerald-600 dark:text-emerald-400">{fmtCount(r.approved)}</span>
-                    {' · '}
-                    <span className="text-red-600 dark:text-red-400">{fmtCount(r.rejected)}</span>
-                  </TD>
-                  <TD className="text-right tabular-nums font-semibold text-slate-900 dark:text-neutral-100">{fmtMoney(r.revenue)}</TD>
-                </TR>
-              ))}
+              {rows.map((r) => {
+                const name = nameByOfferId.get(r.offer_id);
+                return (
+                  <TR key={r.offer_id}>
+                    <TD>
+                      {name ? (
+                        <>
+                          <div className="font-medium text-slate-800 dark:text-neutral-200">{name}</div>
+                          <div className="font-mono text-[11px] text-slate-400 dark:text-neutral-500">{r.offer_id}</div>
+                        </>
+                      ) : (
+                        <span className="font-mono text-xs">{r.offer_id}</span>
+                      )}
+                    </TD>
+                    <TD className="text-right tabular-nums">{fmtCount(r.postbacks)}</TD>
+                    <TD className="text-right tabular-nums">{fmtCount(r.verified)}</TD>
+                    <TD className="text-right tabular-nums">{r.postbacks > 0 ? fmtPct(r.match_rate) : '—'}</TD>
+                    <TD className="text-right tabular-nums text-xs">
+                      <span className="text-emerald-600 dark:text-emerald-400">{fmtCount(r.approved)}</span>
+                      {' · '}
+                      <span className="text-red-600 dark:text-red-400">{fmtCount(r.rejected)}</span>
+                    </TD>
+                    <TD className="text-right tabular-nums font-semibold text-slate-900 dark:text-neutral-100">{fmtMoney(r.revenue)}</TD>
+                  </TR>
+                );
+              })}
             </TBody>
           </Table>
         )}
       </div>
+    </Card>
+  );
+}
+
+// ── Offer multi-select ───────────────────────────────────────────────
+//
+// Read-cheap: the `offers` list is whatever the network actually fired for
+// in the current window (sourced from the same drilldown docs the page
+// already fetched). Selecting offers re-runs the detail query with the
+// new offer_ids set; the backend filters the same daily docs in-memory,
+// so no extra Firestore reads are issued.
+function OfferFilterBar({
+  offers,
+  selectedOfferIds,
+  onChange,
+  range,
+}: {
+  offers: PostbackAvailableOffer[];
+  selectedOfferIds: string[];
+  onChange: (next: string[]) => void;
+  range: ReportRange;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close the dropdown when the user clicks anywhere outside it.
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open]);
+
+  const selectedSet = useMemo(() => new Set(selectedOfferIds), [selectedOfferIds]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return offers;
+    return offers.filter((o) =>
+      o.offer_id.toLowerCase().includes(q) ||
+      (o.name?.toLowerCase().includes(q) ?? false)
+    );
+  }, [offers, search]);
+
+  const labelFor = (o: PostbackAvailableOffer) => o.name ?? o.offer_id;
+
+  function toggle(offer_id: string) {
+    if (selectedSet.has(offer_id)) {
+      onChange(selectedOfferIds.filter((id) => id !== offer_id));
+    } else {
+      onChange([...selectedOfferIds, offer_id]);
+    }
+  }
+
+  function clearAll() {
+    onChange([]);
+  }
+
+  const rangeIsSingleDay =
+    range.from.slice(0, 10) === range.to.slice(0, 10);
+
+  return (
+    <Card>
+      <CardBody className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-neutral-200">
+          <Filter className="h-4 w-4 text-slate-400 dark:text-neutral-500" />
+          Filter by offer
+        </div>
+
+        <div ref={ref} className="relative flex-1">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
+          >
+            <span className="truncate">
+              {selectedOfferIds.length === 0 ? (
+                <span className="text-slate-500 dark:text-neutral-400">
+                  All offers ({offers.length})
+                </span>
+              ) : (
+                `${selectedOfferIds.length} of ${offers.length} selected`
+              )}
+            </span>
+            <ChevronDown className="h-4 w-4 flex-shrink-0 text-slate-400" />
+          </button>
+
+          {open && (
+            <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+              <div className="border-b border-slate-100 p-2 dark:border-neutral-800">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search by name or ID…"
+                    className="w-full rounded border border-slate-200 bg-white py-1.5 pl-7 pr-2 text-xs text-slate-700 placeholder-slate-400 focus:border-brand-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                  />
+                </div>
+              </div>
+
+              <div className="max-h-72 overflow-y-auto">
+                {filtered.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
+                    No offers match.
+                  </div>
+                ) : (
+                  filtered.map((o) => {
+                    const checked = selectedSet.has(o.offer_id);
+                    return (
+                      <button
+                        key={o.offer_id}
+                        type="button"
+                        onClick={() => toggle(o.offer_id)}
+                        className={cn(
+                          'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50 dark:hover:bg-neutral-800',
+                          checked && 'bg-brand-50/40 dark:bg-brand-500/10'
+                        )}
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className={cn(
+                              'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border',
+                              checked
+                                ? 'border-brand-500 bg-brand-500 text-white'
+                                : 'border-slate-300 dark:border-neutral-600'
+                            )}
+                          >
+                            {checked && <Check className="h-3 w-3" />}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-slate-700 dark:text-neutral-200">
+                              {labelFor(o)}
+                            </div>
+                            {o.name && (
+                              <div className="truncate font-mono text-[10px] text-slate-400 dark:text-neutral-500">
+                                {o.offer_id}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <span className="flex-shrink-0 tabular-nums text-slate-500 dark:text-neutral-400">
+                          {fmtCount(o.postbacks)}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {selectedOfferIds.length > 0 && (
+                <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-xs dark:border-neutral-800">
+                  <span className="text-slate-500 dark:text-neutral-400">
+                    {selectedOfferIds.length} selected
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearAll}
+                    className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {selectedOfferIds.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {selectedOfferIds.map((id) => {
+              const o = offers.find((x) => x.offer_id === id);
+              const label = o?.name ?? id;
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-1 text-[11px] text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
+                >
+                  {label}
+                  <button
+                    type="button"
+                    onClick={() => toggle(id)}
+                    aria-label={`Remove ${label}`}
+                    className="rounded-full hover:bg-brand-100 dark:hover:bg-brand-500/20"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="text-[11px] text-slate-400 dark:text-neutral-500 sm:ml-auto sm:text-right">
+          {rangeIsSingleDay
+            ? `Day: ${fmtDateShort(range.from)}`
+            : `${fmtDateShort(range.from)} – ${fmtDateShort(range.to)}`}
+        </div>
+      </CardBody>
     </Card>
   );
 }

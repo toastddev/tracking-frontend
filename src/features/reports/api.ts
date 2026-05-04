@@ -33,6 +33,7 @@ export interface ConversionListParams {
   from?: string;
   to?: string;
   offer_id?: string;
+  offer_ids?: string[];
   network_id?: string;
   verified?: boolean;
   status?: string;
@@ -93,10 +94,21 @@ export const reportsApi = {
       },
     });
   },
-  postbackDetail(network_id: string, params: { from?: string; to?: string } = {}) {
+  postbackDetail(
+    network_id: string,
+    params: { from?: string; to?: string; offer_ids?: string[] } = {},
+  ) {
     return api<PostbackDetailResponse>(
       `/api/reports/postbacks/${encodeURIComponent(network_id)}/detail`,
-      { query: { from: params.from, to: params.to } }
+      {
+        query: {
+          from: params.from,
+          to: params.to,
+          offer_ids: params.offer_ids && params.offer_ids.length > 0
+            ? params.offer_ids.join(',')
+            : undefined,
+        },
+      },
     );
   },
   backfillOffers(params: { from?: string; to?: string } = {}) {
@@ -224,6 +236,9 @@ export const allConversionsApi = {
         from: params.from,
         to: params.to,
         offer_id: params.offer_id,
+        offer_ids: params.offer_ids && params.offer_ids.length > 0
+          ? params.offer_ids.join(',')
+          : undefined,
         network_id: params.network_id,
         verified: params.verified === undefined ? undefined : String(params.verified),
         status: params.status,

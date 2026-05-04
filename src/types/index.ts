@@ -502,6 +502,16 @@ export interface PostbackDetailResponse {
     verified: RecentVerifiedSample[];
     unmatched: UnmatchedSample[];
   };
+
+  available_offers: PostbackAvailableOffer[];
+  applied_offer_ids: string[];
+  offer_filter_applied: boolean;
+}
+
+export interface PostbackAvailableOffer {
+  offer_id: string;
+  name?: string;
+  postbacks: number;
 }
 
 // ── Per-campaign reports (TTL-safe rollup) ───────────────────────────
