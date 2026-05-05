@@ -87,6 +87,10 @@ export const googleAdsApi = {
     return api<{ ok: true }>(`${BASE}/connections/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
 
+  refreshMccChildren(id: string) {
+    return api<{ mcc_children: GoogleAdsMccChild[] }>(`${BASE}/connections/${encodeURIComponent(id)}/mcc-children/refresh`, { method: 'POST' });
+  },
+
   listConversionActions(connection_id: string, opts: { refresh?: boolean } = {}) {
     return api<{ items: GoogleAdsConversionAction[] }>(
       `${BASE}/connections/${encodeURIComponent(connection_id)}/conversion-actions`,

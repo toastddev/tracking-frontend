@@ -77,6 +77,13 @@ export function GoogleAdsConnectionPanel({ connection }: Props) {
     },
   });
 
+  const refreshMccChildren = useMutation({
+    mutationFn: () => googleAdsApi.refreshMccChildren(connection.connection_id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['google-ads-connection-detail', connection.connection_id] });
+    },
+  });
+
   // Re-hydrate when the connection prop refreshes after a save.
   useEffect(() => {
     setSaleAction(connection.sale_conversion_action_resource ?? '');
@@ -203,19 +210,33 @@ export function GoogleAdsConnectionPanel({ connection }: Props) {
           )}
         </div>
 
-        {connection.type === 'mcc' && mccChildren.length > 0 && (
+        {connection.type === 'mcc' && (
           <details className="text-sm">
             <summary className="cursor-pointer text-slate-600 dark:text-neutral-400">
               Cross-account coverage — {mccChildren.length} child accounts under this MCC
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  refreshMccChildren.mutate();
+                }}
+                disabled={refreshMccChildren.isPending}
+                className="ml-4 inline-flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+              >
+                {refreshMccChildren.isPending ? <Spinner className="h-3 w-3" /> : <RefreshCw className="h-3 w-3" />}
+                Refresh Accounts
+              </button>
             </summary>
-            <ul className="mt-2 grid gap-1 sm:grid-cols-2">
-              {mccChildren.map((c) => (
-                <li key={c.ga_child_id} className="rounded bg-slate-50 px-2 py-1 text-xs text-slate-700 dark:bg-neutral-950/40 dark:text-neutral-300">
-                  <span className="font-medium">{c.descriptive_name || '—'}</span>
-                  <span className="text-slate-500 dark:text-neutral-400"> · <code className="font-mono">{formatCustomerId(c.customer_id)}</code></span>
-                </li>
-              ))}
-            </ul>
+            {mccChildren.length > 0 ? (
+              <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+                {mccChildren.map((c) => (
+                  <li key={c.ga_child_id} className="rounded bg-slate-50 px-2 py-1 text-xs text-slate-700 dark:bg-neutral-950/40 dark:text-neutral-300">
+                    <span className="font-medium">{c.descriptive_name || '—'}</span>
+                    <span className="text-slate-500 dark:text-neutral-400"> · <code className="font-mono">{formatCustomerId(c.customer_id)}</code></span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </details>
         )}
       </div>
