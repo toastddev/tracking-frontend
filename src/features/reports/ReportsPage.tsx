@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { CenteredSpinner, Spinner } from '@/components/ui/Spinner';
 import { reportsApi } from './api';
-import { ReportFilters, buildPresetRange, type ReportRange } from './ReportFilters';
+import { useDateRange } from '@/lib/dateRange';
 import { ActivityChart, RevenueChart } from './ReportChart';
 import { ClicksReportTab } from './ClicksReportTab';
 import { ConversionsReportTab } from './ConversionsReportTab';
@@ -22,12 +22,8 @@ const TABS: { key: Tab; label: string; description: string }[] = [
   { key: 'postbacks',   label: 'Postbacks',   description: 'All postback events (verified + unverified).' },
 ];
 
-function defaultRange(): ReportRange {
-  return buildPresetRange('30d');
-}
-
 export function ReportsPage() {
-  const [range, setRange] = useState<ReportRange>(defaultRange);
+  const { range } = useDateRange();
   const [tab, setTab] = useState<Tab>('offers');
 
   const queryArgs = useMemo(
@@ -35,17 +31,16 @@ export function ReportsPage() {
     [range.from, range.to]
   );
 
-  const summaryQuery = useQuery({
-    queryKey: ['reports', 'summary', queryArgs],
-    queryFn: () => reportsApi.summary(queryArgs),
+  // Combined summary + timeseries — one HTTP round-trip backed by one
+  // Firestore rollup scan.
+  const overviewQuery = useQuery({
+    queryKey: ['reports', 'overview', queryArgs],
+    queryFn: () => reportsApi.overview(queryArgs),
     staleTime: 30_000,
   });
 
-  const timeseriesQuery = useQuery({
-    queryKey: ['reports', 'timeseries', queryArgs],
-    queryFn: () => reportsApi.timeseries(queryArgs),
-    staleTime: 30_000,
-  });
+  const summary = overviewQuery.data?.summary;
+  const points = overviewQuery.data?.points ?? [];
 
   return (
     <>
@@ -53,48 +48,44 @@ export function ReportsPage() {
         title="Reports"
         description="Clicks, postbacks, conversions, and revenue — across every offer and network."
         actions={
-          (summaryQuery.isFetching || timeseriesQuery.isFetching) && (
+          overviewQuery.isFetching && (
             <Spinner className="text-slate-400 dark:text-neutral-500" />
           )
         }
       />
 
-      <div className="mb-6">
-        <ReportFilters value={range} onChange={setRange} />
-      </div>
-
       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           icon={<MousePointerClick className="h-4 w-4" />}
           label="Clicks"
-          value={fmtCount(summaryQuery.data?.clicks)}
-          loading={summaryQuery.isLoading}
+          value={fmtCount(summary?.clicks)}
+          loading={overviewQuery.isLoading}
         />
         <StatCard
           icon={<Webhook className="h-4 w-4" />}
           label="Postbacks"
-          value={fmtCount(summaryQuery.data?.postbacks)}
-          loading={summaryQuery.isLoading}
-          sub={summaryQuery.data
-            ? `${fmtCount(summaryQuery.data.unverified)} unverified`
+          value={fmtCount(summary?.postbacks)}
+          loading={overviewQuery.isLoading}
+          sub={summary
+            ? `${fmtCount(summary.unverified)} unverified`
             : undefined}
         />
         <StatCard
           icon={<BarChart3 className="h-4 w-4" />}
           label="Conversions"
-          value={fmtCount(summaryQuery.data?.conversions)}
-          loading={summaryQuery.isLoading}
-          sub={summaryQuery.data
-            ? `${(summaryQuery.data.cvr * 100).toFixed(2)}% CVR`
+          value={fmtCount(summary?.conversions)}
+          loading={overviewQuery.isLoading}
+          sub={summary
+            ? `${(summary.cvr * 100).toFixed(2)}% CVR`
             : undefined}
         />
         <StatCard
           icon={<DollarSign className="h-4 w-4" />}
           label="Revenue"
-          value={fmtMoney(summaryQuery.data?.revenue)}
-          loading={summaryQuery.isLoading}
-          sub={summaryQuery.data
-            ? `${fmtMoney(summaryQuery.data.epc)} EPC`
+          value={fmtMoney(summary?.revenue)}
+          loading={overviewQuery.isLoading}
+          sub={summary
+            ? `${fmtMoney(summary.epc)} EPC`
             : undefined}
         />
       </div>
@@ -106,10 +97,10 @@ export function ReportsPage() {
             subtitle="Sum of payout for verified conversions, bucketed by day."
           />
           <CardBody className="p-0">
-            {timeseriesQuery.isLoading ? (
+            {overviewQuery.isLoading ? (
               <CenteredSpinner />
             ) : (
-              <RevenueChart points={timeseriesQuery.data?.points ?? []} />
+              <RevenueChart points={points} />
             )}
           </CardBody>
         </Card>
@@ -120,10 +111,10 @@ export function ReportsPage() {
             subtitle="Daily clicks alongside verified and unverified postback events."
           />
           <CardBody className="p-0">
-            {timeseriesQuery.isLoading ? (
+            {overviewQuery.isLoading ? (
               <CenteredSpinner />
             ) : (
-              <ActivityChart points={timeseriesQuery.data?.points ?? []} />
+              <ActivityChart points={points} />
             )}
           </CardBody>
         </Card>

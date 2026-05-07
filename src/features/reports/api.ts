@@ -59,12 +59,22 @@ export interface CampaignReportParams {
   campaign_ids?: string[];
 }
 
+export interface ReportOverview {
+  summary: ReportSummary;
+  points: TimeseriesPoint[];
+}
+
 export const reportsApi = {
   summary(params: ReportParams = {}) {
     return api<ReportSummary>('/api/reports/summary', { query: params });
   },
   timeseries(params: ReportParams = {}) {
     return api<{ points: TimeseriesPoint[] }>('/api/reports/timeseries', { query: params });
+  },
+  // Combined endpoint: one HTTP round-trip + one rollup scan covers both
+  // summary cards and timeseries charts on /reports.
+  overview(params: ReportParams = {}) {
+    return api<ReportOverview>('/api/reports/overview', { query: params });
   },
   offers(params: OfferReportParams = {}) {
     return api<OfferReportsResponse>('/api/reports/offers', {

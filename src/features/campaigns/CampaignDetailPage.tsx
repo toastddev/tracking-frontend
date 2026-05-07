@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { useUrlSyncedDateRange } from '@/lib/dateRange';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
@@ -41,7 +42,7 @@ import { fmtMoney } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { reportsApi } from '@/features/reports/api';
-import { buildPresetRange, type ReportRange } from '@/features/reports/ReportFilters';
+import { type ReportRange } from '@/features/reports/ReportFilters';
 import type {
   CampaignDetailDailyPoint,
   CampaignDetailDeltas,
@@ -93,19 +94,11 @@ function fmtDateShort(d: string): string {
   return `${dt.toLocaleDateString(undefined, { month: 'short' })} ${dt.getDate()}`;
 }
 
-function rangeFromQuery(qp: URLSearchParams): ReportRange {
-  const from = qp.get('from');
-  const to = qp.get('to');
-  if (from && to && !Number.isNaN(new Date(from).getTime()) && !Number.isNaN(new Date(to).getTime())) {
-    return { from, to, preset: 'custom' };
-  }
-  return buildPresetRange('30d');
-}
-
 export function CampaignDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const [search] = useSearchParams();
-  const range = useMemo(() => rangeFromQuery(search), [search]);
+  // Adopts ?from/?to from the URL on first mount; subsequent global-filter
+  // changes flow back into the URL so the address bar stays shareable.
+  const range: ReportRange = useUrlSyncedDateRange();
   const qc = useQueryClient();
 
   const detailQuery = useQuery({

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { useUrlSyncedDateRange } from '@/lib/dateRange';
 import { useQuery } from '@tanstack/react-query';
 import {
   Area,
@@ -55,7 +56,7 @@ import type {
   SubIdBreakdown,
 } from '@/types';
 import { reportsApi } from './api';
-import { buildPresetRange, type ReportRange } from './ReportFilters';
+import { type ReportRange } from './ReportFilters';
 
 const fmtCount = (v: number) =>
   new Intl.NumberFormat(undefined, {
@@ -86,21 +87,11 @@ function fmtDateShort(d: string): string {
   return `${dt.toLocaleDateString(undefined, { month: 'short' })} ${dt.getDate()}`;
 }
 
-// Parse the optional ?from/?to off the URL — falls back to the default 30d
-// preset so a stale link still renders something useful.
-function rangeFromQuery(qp: URLSearchParams): ReportRange {
-  const from = qp.get('from');
-  const to = qp.get('to');
-  if (from && to && !Number.isNaN(new Date(from).getTime()) && !Number.isNaN(new Date(to).getTime())) {
-    return { from, to, preset: 'custom' };
-  }
-  return buildPresetRange('30d');
-}
-
 export function OfferReportDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
-  const [search] = useSearchParams();
-  const range = useMemo(() => rangeFromQuery(search), [search]);
+  // Adopts ?from/?to from the URL on first mount (so shared links scope
+  // correctly) and keeps the URL in sync with the global filter thereafter.
+  const range: ReportRange = useUrlSyncedDateRange();
 
   const detailQuery = useQuery({
     queryKey: ['report-offer-detail', id, range.from, range.to],

@@ -63,7 +63,8 @@ import type {
   UnmatchedSample,
 } from '@/types';
 import { reportsApi } from './api';
-import { buildPresetRange, type ReportRange } from './ReportFilters';
+import { type ReportRange } from './ReportFilters';
+import { useUrlSyncedDateRange } from '@/lib/dateRange';
 import { ConversionsReportTab } from './ConversionsReportTab';
 
 const fmtCount = (v: number) =>
@@ -98,15 +99,6 @@ function fmtDateShort(d: string): string {
   return `${dt.toLocaleDateString(undefined, { month: 'short' })} ${dt.getDate()}`;
 }
 
-function rangeFromQuery(qp: URLSearchParams): ReportRange {
-  const from = qp.get('from');
-  const to = qp.get('to');
-  if (from && to && !Number.isNaN(new Date(from).getTime()) && !Number.isNaN(new Date(to).getTime())) {
-    return { from, to, preset: 'custom' };
-  }
-  return buildPresetRange('30d');
-}
-
 function offerIdsFromQuery(qp: URLSearchParams): string[] {
   const raw = qp.get('offer_ids');
   if (!raw) return [];
@@ -116,7 +108,11 @@ function offerIdsFromQuery(qp: URLSearchParams): string[] {
 export function PostbackReportDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const [search, setSearch] = useSearchParams();
-  const range = useMemo(() => rangeFromQuery(search), [search]);
+  // Adopts ?from/?to on first mount and keeps the URL synced with the
+  // global filter thereafter. offer_ids stays managed by this page directly
+  // via setSearch — they compose correctly because each setSearch reads the
+  // current URL state.
+  const range: ReportRange = useUrlSyncedDateRange();
   const selectedOfferIds = useMemo(() => offerIdsFromQuery(search), [search]);
 
   // Stable, sorted+joined key so query cache hits regardless of selection order.

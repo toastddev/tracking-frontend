@@ -3,6 +3,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Menu, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { ThemeToggle } from './ThemeToggle';
+import { useDateRange } from '@/lib/dateRange';
+import { ReportFilters, type ReportRange } from '@/features/reports/ReportFilters';
 
 export function Layout() {
   const [navOpen, setNavOpen] = useState(false);
@@ -74,9 +76,23 @@ export function Layout() {
 
       <main className="flex-1 md:overflow-y-auto">
         <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+          <GlobalDateFilter />
           <Outlet />
         </div>
       </main>
+    </div>
+  );
+}
+
+// Global date-range bar. Renders on every protected route. Pages that show
+// date-windowed data read from useDateRange(); list pages without time-series
+// (offers, postbacks, connections, settings, etc.) ignore the value — the
+// filter is harmlessly inert there.
+function GlobalDateFilter() {
+  const { range, setRange } = useDateRange();
+  return (
+    <div className="mb-6">
+      <ReportFilters value={range as ReportRange} onChange={(r) => setRange(r)} />
     </div>
   );
 }

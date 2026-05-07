@@ -44,7 +44,8 @@ import { fmtMoney } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { reportsApi } from '@/features/reports/api';
-import { ReportFilters, buildPresetRange, type ReportRange } from '@/features/reports/ReportFilters';
+import { type ReportRange } from '@/features/reports/ReportFilters';
+import { useDateRange } from '@/lib/dateRange';
 import type {
   CampaignDailyPoint,
   CampaignInsight,
@@ -114,7 +115,7 @@ const SORT_LABEL: Record<SortKey, string> = {
 };
 
 export function CampaignReportsPage() {
-  const [range, setRange] = useState<ReportRange>(() => buildPresetRange('30d'));
+  const { range } = useDateRange();
   const [sortKey, setSortKey] = useState<SortKey>('revenue');
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
   const [backfillMsg, setBackfillMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
@@ -308,10 +309,6 @@ export function CampaignReportsPage() {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="mb-6">
-        <ReportFilters value={range} onChange={setRange} />
       </div>
 
       {backfillMsg && (
