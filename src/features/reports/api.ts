@@ -127,9 +127,13 @@ export const reportsApi = {
       from: string;
       to: string;
       clicks_scanned: number;
+      clicks_untouched: true;
+      existing_buckets_scanned: number;
       conversions_scanned: number;
       buckets_written: number;
       duration_ms: number;
+      truncated?: boolean;
+      truncated_reason?: string;
     }>('/api/reports/offers/backfill', {
       method: 'POST',
       body: { from: params.from, to: params.to },
@@ -170,12 +174,17 @@ export const reportsApi = {
       from: string;
       to: string;
       clicks_scanned: number;
+      clicks_untouched: true;
+      click_metadata_scanned: number;
       clicks_with_campaign: number;
+      existing_buckets_scanned: number;
       conversions_scanned: number;
       conversions_with_campaign: number;
       conversions_orphan_lookups: number;
       buckets_written: number;
       duration_ms: number;
+      truncated?: boolean;
+      truncated_reason?: string;
       campaign_spends?: Array<{
         campaign_id: string;
         campaign_name: string;

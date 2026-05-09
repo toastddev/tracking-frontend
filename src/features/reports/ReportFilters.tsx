@@ -3,40 +3,25 @@ import { RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import {
+  DEFAULT_PRESET,
+  RANGE_PRESETS,
+  buildPresetRange,
+  type DateRange,
+  type RangePreset,
+} from '@/lib/dateRange';
 
-export type RangePreset = '1d' | '2d' | '7d' | '30d' | '90d' | 'custom';
-
-export interface ReportRange {
-  from: string; // ISO
-  to: string;   // ISO
-  preset: RangePreset;
-}
-
-export const DEFAULT_PRESET: RangePreset = '30d';
-
-const PRESETS: { key: RangePreset; label: string; hours: number }[] = [
-  { key: '1d',  label: '1 day',   hours: 24 },
-  { key: '2d',  label: '2 days',  hours: 48 },
-  { key: '7d',  label: 'Week',    hours: 24 * 7 },
-  { key: '30d', label: 'Month',   hours: 24 * 30 },
-  { key: '90d', label: '90 days', hours: 24 * 90 },
-];
-
-export function buildPresetRange(preset: RangePreset): ReportRange {
-  if (preset === 'custom') throw new Error('cannot build custom from preset');
-  const p = PRESETS.find((x) => x.key === preset);
-  if (!p) throw new Error(`bad preset ${preset}`);
-  const to = new Date();
-  const from = new Date(to.getTime() - p.hours * 60 * 60 * 1000);
-  return { from: from.toISOString(), to: to.toISOString(), preset };
-}
+export type ReportRange = DateRange;
+export type { RangePreset };
+export { DEFAULT_PRESET, buildPresetRange };
 
 // Convert ISO → the value datetime-local inputs want (no TZ, minute precision).
+// This variant uses UTC components so the UI reflects UTC time.
 function toLocal(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
 interface Props {
@@ -55,8 +40,9 @@ export function ReportFilters({ value, onChange }: Props) {
   }, [value.from, value.to]);
 
   function applyCustom() {
-    const f = new Date(from);
-    const t = new Date(to);
+    // Append 'Z' so the browser treats the YYYY-MM-DDTHH:mm input as UTC.
+    const f = new Date(from + 'Z');
+    const t = new Date(to + 'Z');
     if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) return;
     if (f.getTime() > t.getTime()) return;
     onChange({ from: f.toISOString(), to: t.toISOString(), preset: 'custom' });
@@ -67,7 +53,7 @@ export function ReportFilters({ value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-card sm:flex-row sm:items-center sm:justify-between dark:border-neutral-800 dark:bg-neutral-900 dark:shadow-card-dark">
       <div className="inline-flex flex-wrap items-center gap-1">
-        {PRESETS.map((p) => {
+        {RANGE_PRESETS.map((p) => {
           const active = value.preset === p.key;
           return (
             <button
@@ -107,7 +93,7 @@ export function ReportFilters({ value, onChange }: Props) {
             onChange(buildPresetRange(DEFAULT_PRESET));
           }}
           disabled={isDefault}
-          title="Reset range to last 30 days"
+          title="Reset range to this month"
           className={cn(
             'ml-1 inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium transition-colors',
             'text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40 disabled:hover:bg-transparent',

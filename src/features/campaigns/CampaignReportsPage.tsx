@@ -144,12 +144,13 @@ export function CampaignReportsPage() {
       setBackfillMsg({
         tone: 'success',
         text:
-          `Rebuilt from ${r.clicks_scanned.toLocaleString()} clicks ` +
-          `(${r.clicks_with_campaign.toLocaleString()} tagged) and ` +
-          `${r.conversions_scanned.toLocaleString()} conversions ` +
+          `Rebuilt conversion/revenue fields from ${r.conversions_scanned.toLocaleString()} conversions ` +
           `(${r.conversions_with_campaign.toLocaleString()} attributed) ` +
           `into ${r.buckets_written.toLocaleString()} campaign-day buckets ` +
-          `(${(r.duration_ms / 1000).toFixed(1)}s).${spendsText}`,
+          `(${(r.duration_ms / 1000).toFixed(1)}s). Click totals were left untouched; ` +
+          `${r.click_metadata_scanned.toLocaleString()} clicks were scanned only for campaign attribution.` +
+          `${r.truncated ? ` Rebuild was truncated: ${r.truncated_reason ?? 'safety cap reached'}.` : ''}` +
+          spendsText,
       });
       qc.invalidateQueries({ queryKey: ['reports', 'campaigns'] });
       qc.invalidateQueries({ queryKey: ['report-campaign-detail'] });

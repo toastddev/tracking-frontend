@@ -148,10 +148,10 @@ export function OfferReportsTab({ range }: Props) {
     mutationFn: () => reportsApi.backfillOffers({ from: range.from, to: range.to }),
     onSuccess: (r) => {
       setBackfillMsg(
-        `Rebuilt from ${r.clicks_scanned.toLocaleString()} clicks and ` +
-        `${r.conversions_scanned.toLocaleString()} conversions ` +
+        `Rebuilt conversion/revenue fields from ${r.conversions_scanned.toLocaleString()} conversions ` +
         `into ${r.buckets_written.toLocaleString()} daily buckets ` +
-        `(${(r.duration_ms / 1000).toFixed(1)}s).`
+        `(${(r.duration_ms / 1000).toFixed(1)}s). Click totals were left untouched.` +
+        (r.truncated ? ` Rebuild was truncated: ${r.truncated_reason ?? 'safety cap reached'}.` : '')
       );
       qc.invalidateQueries({ queryKey: ['reports'] });
     },

@@ -16,9 +16,17 @@ import { useSearchParams } from 'react-router-dom';
 
 const STORAGE_KEY = 'dashboard:date-range:v1';
 
-export type RangePreset = '1d' | '2d' | '7d' | '30d' | '90d' | 'custom';
+export type RangePreset =
+  | 'today'
+  | 'yesterday'
+  | 'this_week'
+  | 'last_week'
+  | 'this_month'
+  | 'last_month'
+  | 'last_90d'
+  | 'custom';
 
-export const DEFAULT_PRESET: RangePreset = '30d';
+export const DEFAULT_PRESET: RangePreset = 'this_month';
 
 export interface DateRange {
   from: string; // ISO
@@ -29,23 +37,103 @@ export interface DateRange {
 interface PresetSpec {
   key: RangePreset;
   label: string;
-  hours: number;
 }
 
 export const RANGE_PRESETS: PresetSpec[] = [
-  { key: '1d',  label: '1 day',   hours: 24 },
-  { key: '2d',  label: '2 days',  hours: 48 },
-  { key: '7d',  label: 'Week',    hours: 24 * 7 },
-  { key: '30d', label: 'Month',   hours: 24 * 30 },
-  { key: '90d', label: '90 days', hours: 24 * 90 },
+  { key: 'today',      label: 'Today (UTC)' },
+  { key: 'yesterday',  label: 'Yesterday (UTC)' },
+  { key: 'this_week',  label: 'This week (UTC)' },
+  { key: 'last_week',  label: 'Last week (UTC)' },
+  { key: 'this_month', label: 'This month (UTC)' },
+  { key: 'last_month', label: 'Last month (UTC)' },
+  { key: 'last_90d',   label: 'Last 90 days (UTC)' },
 ];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfUtcDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+function endOfUtcDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1) - 1);
+}
+
+function addUtcDays(d: Date, days: number): Date {
+  return new Date(d.getTime() + days * DAY_MS);
+}
+
+function startOfUtcWeek(d: Date): Date {
+  const dayStart = startOfUtcDay(d);
+  const dow = dayStart.getUTCDay();
+  const daysSinceMonday = (dow + 6) % 7;
+  return addUtcDays(dayStart, -daysSinceMonday);
+}
+
+function startOfUtcMonth(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+}
+
+function endOfUtcMonth(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) - 1);
+}
+
+function normalizePreset(preset: unknown): RangePreset | null {
+  if (typeof preset !== 'string') return null;
+  if (RANGE_PRESETS.some((p) => p.key === preset)) return preset as RangePreset;
+  if (preset === '1d') return 'today';
+  if (preset === '2d') return 'yesterday';
+  if (preset === '7d') return 'this_week';
+  if (preset === '30d') return 'this_month';
+  if (preset === '90d') return 'last_90d';
+  return null;
+}
 
 export function buildPresetRange(preset: RangePreset): DateRange {
   if (preset === 'custom') throw new Error('cannot build custom from preset');
-  const p = RANGE_PRESETS.find((x) => x.key === preset);
-  if (!p) throw new Error(`bad preset ${preset}`);
-  const to = new Date();
-  const from = new Date(to.getTime() - p.hours * 60 * 60 * 1000);
+  const now = new Date();
+  const todayStart = startOfUtcDay(now);
+  const todayEnd = endOfUtcDay(now);
+  let from: Date;
+  let to: Date;
+
+  switch (preset) {
+    case 'today':
+      from = todayStart;
+      to = todayEnd;
+      break;
+    case 'yesterday':
+      from = addUtcDays(todayStart, -1);
+      to = new Date(todayStart.getTime() - 1);
+      break;
+    case 'this_week':
+      from = startOfUtcWeek(now);
+      to = todayEnd;
+      break;
+    case 'last_week': {
+      const thisWeekStart = startOfUtcWeek(now);
+      from = addUtcDays(thisWeekStart, -7);
+      to = new Date(thisWeekStart.getTime() - 1);
+      break;
+    }
+    case 'this_month':
+      from = startOfUtcMonth(now);
+      to = todayEnd;
+      break;
+    case 'last_month': {
+      const firstThisMonth = startOfUtcMonth(now);
+      const previousMonthDay = new Date(firstThisMonth.getTime() - 1);
+      from = startOfUtcMonth(previousMonthDay);
+      to = endOfUtcMonth(previousMonthDay);
+      break;
+    }
+    case 'last_90d':
+      from = addUtcDays(todayStart, -89);
+      to = todayEnd;
+      break;
+    default:
+      throw new Error(`bad preset ${preset}`);
+  }
   return { from: from.toISOString(), to: to.toISOString(), preset };
 }
 
@@ -63,11 +151,11 @@ function loadInitial(): DateRange {
     if (!Number.isFinite(f) || !Number.isFinite(t) || f > t) {
       return buildPresetRange(DEFAULT_PRESET);
     }
-    // Re-anchor relative presets to "now" so a stored "30d" still means the
-    // last 30 days at the time of the next visit, not the slice that was
-    // current when it was saved.
-    const presetMatch = RANGE_PRESETS.find((p) => p.key === parsed.preset);
-    if (presetMatch) return buildPresetRange(presetMatch.key);
+    // Re-anchor relative presets to "now" so a stored preset still means the
+    // current calendar period at the time of the next visit, not the slice
+    // that was current when it was saved.
+    const preset = normalizePreset(parsed.preset);
+    if (preset) return buildPresetRange(preset);
     return { from: parsed.from, to: parsed.to, preset: 'custom' };
   } catch {
     return buildPresetRange(DEFAULT_PRESET);
