@@ -43,14 +43,43 @@ interface FormState {
   mapping_txn_id: string;
   mapping_timestamp: string;
   default_status: string;
+  postback_timezone: string;
   postback_api_id: string;
   extras: ExtraRow[];
+}
+
+// Common timezones shown at the top of the dropdown, then all IANA zones.
+const COMMON_TIMEZONES = [
+  'UTC',
+  'America/New_York',     // EST/EDT
+  'America/Chicago',      // CST/CDT
+  'America/Denver',       // MST/MDT
+  'America/Los_Angeles',  // PST/PDT
+  'Europe/London',
+  'Europe/Berlin',
+  'Europe/Paris',
+  'Asia/Kolkata',         // IST
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Australia/Sydney',
+];
+
+function getAllTimezones(): string[] {
+  try {
+    const all = (Intl as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
+    const common = new Set(COMMON_TIMEZONES);
+    const rest = all.filter((tz: string) => !common.has(tz));
+    return [...COMMON_TIMEZONES, ...rest];
+  } catch {
+    return COMMON_TIMEZONES;
+  }
 }
 
 const empty: FormState = {
   network_id: '', name: '', status: 'active',
   mapping_click_id: 'click_id', mapping_payout: '', mapping_currency: '',
   mapping_status: '', mapping_txn_id: '', mapping_timestamp: '', default_status: 'approved',
+  postback_timezone: '',
   postback_api_id: '',
   extras: [],
 };
@@ -91,6 +120,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
         mapping_txn_id: initial.mapping_txn_id ?? '',
         mapping_timestamp: initial.mapping_timestamp ?? '',
         default_status: initial.default_status ?? 'approved',
+        postback_timezone: initial.postback_timezone ?? '',
         postback_api_id: initial.postback_api_id ?? '',
         extras: extrasFromNetwork(initial),
       });
@@ -164,6 +194,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
         mapping_txn_id: form.mapping_txn_id.trim() || undefined,
         mapping_timestamp: form.mapping_timestamp.trim() || undefined,
         default_status: form.default_status.trim() || undefined,
+        postback_timezone: form.postback_timezone.trim() || undefined,
         postback_api_id: form.postback_api_id.trim() || undefined,
         extra_mappings: extras.value,
       };
@@ -284,6 +315,16 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
                 onChange={update('default_status')}
                 placeholder="approved"
               />
+              <div>
+                <label className="label">Postback timezone (Google Ads only)</label>
+                <Select value={form.postback_timezone} onChange={update('postback_timezone')}>
+                  <option value="">— Auto (server time) —</option>
+                  {getAllTimezones().map((tz) => (
+                    <option key={tz} value={tz}>{tz}</option>
+                  ))}
+                </Select>
+                <p className="hint">Timezone the network sends event timestamps in. Only affects Google Ads upload — does not change tracking or reports.</p>
+              </div>
               <div>
                 <label className="label">API integration (optional)</label>
                 <Select value={form.postback_api_id} onChange={update('postback_api_id')}>

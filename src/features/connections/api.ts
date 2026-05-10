@@ -76,6 +76,7 @@ export const googleAdsApi = {
     | 'sale_conversion_action_name'
     | 'click_conversion_action_resource'
     | 'click_conversion_action_name'
+    | 'convert_tz_to_account'
   >>) {
     return api<GoogleAdsConnection>(`${BASE}/connections/${encodeURIComponent(id)}`, {
       method: 'PATCH',

@@ -23,6 +23,7 @@ export interface Network {
   mapping_timestamp?: string;
   extra_mappings?: Record<string, string>;
   default_status?: string;
+  postback_timezone?: string;
   postback_api_id?: string;
   created_at?: string;
   updated_at?: string;

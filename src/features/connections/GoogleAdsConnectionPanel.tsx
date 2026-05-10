@@ -29,6 +29,7 @@ export function GoogleAdsConnectionPanel({ connection }: Props) {
 
   const [saleAction, setSaleAction] = useState(connection.sale_conversion_action_resource ?? '');
   const [clickAction, setClickAction] = useState(connection.click_conversion_action_resource ?? '');
+  const [convertTz, setConvertTz] = useState(connection.convert_tz_to_account ?? false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -58,6 +59,7 @@ export function GoogleAdsConnectionPanel({ connection }: Props) {
         sale_conversion_action_name: sale?.name ?? '',
         click_conversion_action_resource: clickAction || undefined,
         click_conversion_action_name: click?.name ?? '',
+        convert_tz_to_account: convertTz,
       });
     },
     onSuccess: () => {
@@ -88,7 +90,13 @@ export function GoogleAdsConnectionPanel({ connection }: Props) {
   useEffect(() => {
     setSaleAction(connection.sale_conversion_action_resource ?? '');
     setClickAction(connection.click_conversion_action_resource ?? '');
-  }, [connection.connection_id, connection.sale_conversion_action_resource, connection.click_conversion_action_resource]);
+    setConvertTz(connection.convert_tz_to_account ?? false);
+  }, [
+    connection.connection_id,
+    connection.sale_conversion_action_resource,
+    connection.click_conversion_action_resource,
+    connection.convert_tz_to_account,
+  ]);
 
   const mccChildren = detailQ.data?.mcc_children ?? [];
 
@@ -182,6 +190,28 @@ export function GoogleAdsConnectionPanel({ connection }: Props) {
                 </option>
               ))}
             </Select>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-2 pt-2">
+          <input
+            type="checkbox"
+            id={`convert-tz-${connection.connection_id}`}
+            checked={convertTz}
+            onChange={(e) => setConvertTz(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600 dark:border-neutral-700 dark:bg-neutral-900 dark:focus:ring-brand-500"
+          />
+          <div>
+            <label
+              htmlFor={`convert-tz-${connection.connection_id}`}
+              className="text-sm font-medium text-slate-800 dark:text-neutral-200"
+            >
+              Convert timestamps to account timezone
+            </label>
+            <p className="text-xs text-slate-500 dark:text-neutral-400">
+              When off (default), conversions are sent using their original postback timezone. When on,
+              timestamps are converted to the Google Ads account timezone ({connection.time_zone || 'UTC'}) before sending.
+            </p>
           </div>
         </div>
 

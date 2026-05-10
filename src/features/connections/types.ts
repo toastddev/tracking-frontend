@@ -16,6 +16,7 @@ export interface GoogleAdsConnection {
   click_conversion_action_name?: string;
   status: GoogleAdsConnectionStatus;
   last_error?: string;
+  convert_tz_to_account?: boolean;
   created_at?: string;
   updated_at?: string;
 }
