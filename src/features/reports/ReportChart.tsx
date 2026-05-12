@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useTheme } from '@/lib/theme';
+import { fmtMoneyCompact as fmtMoney } from '@/lib/format';
 import type { TimeseriesPoint } from '@/types';
 
 interface Props {
@@ -19,8 +20,6 @@ interface Props {
 }
 
 const fmtCount = (v: number) => new Intl.NumberFormat(undefined, { notation: 'compact' }).format(v);
-const fmtMoney = (v: number) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(v);
 
 // Shared colour palette resolved once per theme so the three charts below
 // stay visually consistent.
@@ -88,7 +87,7 @@ export function RevenueChart({ points }: Props) {
           tick={{ fill: c.axis, fontSize: 11 }}
           stroke={c.grid}
           tickLine={false}
-          tickFormatter={fmtMoney}
+          tickFormatter={(v) => fmtMoney(Number(v))}
           width={56}
         />
         <Tooltip

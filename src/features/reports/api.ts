@@ -267,3 +267,14 @@ export const allConversionsApi = {
     });
   },
 };
+
+export interface AppConfig {
+  display_currency: string;
+}
+
+export const configApi = {
+  get() {
+    return api<AppConfig>('/api/config');
+  },
+};
+

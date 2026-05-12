@@ -12,6 +12,7 @@ import { ConversionsReportTab } from './ConversionsReportTab';
 import { PostbacksReportTab } from './PostbacksReportTab';
 import { OfferReportsTab } from './OfferReportsTab';
 import { cn } from '@/lib/cn';
+import { fmtMoney } from '@/lib/format';
 
 type Tab = 'offers' | 'clicks' | 'conversions' | 'postbacks';
 
@@ -186,17 +187,4 @@ function Skeleton({ className }: { className?: string }) {
 function fmtCount(n: number | undefined): string {
   if (n == null) return '—';
   return new Intl.NumberFormat().format(n);
-}
-
-function fmtMoney(n: number | undefined): string {
-  if (n == null) return '—';
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return n.toFixed(2);
-  }
 }

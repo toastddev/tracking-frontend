@@ -37,7 +37,7 @@ import { Badge } from '@/components/ui/Badge';
 import { CenteredSpinner, Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/Table';
-import { fmtMoney, fmtDateTime } from '@/lib/format';
+import { fmtMoney, fmtDateTime, getDisplayCurrency } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import type {
@@ -417,7 +417,7 @@ function RevenueClicksChart({ series }: { series: OfferDetailDailyPoint[] }) {
                 tickFormatter={(v) =>
                   new Intl.NumberFormat(undefined, {
                     style: 'currency',
-                    currency: 'USD',
+                    currency: getDisplayCurrency(),
                     notation: 'compact',
                   }).format(Number(v))
                 }

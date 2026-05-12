@@ -42,7 +42,7 @@ import { Badge } from '@/components/ui/Badge';
 import { CenteredSpinner, Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/Table';
-import { fmtMoney, fmtDateTime } from '@/lib/format';
+import { fmtMoney, fmtDateTime, getDisplayCurrency } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import type {
@@ -491,7 +491,7 @@ function DeliveryChart({ series }: { series: PostbackDetailDailyPoint[] }) {
   const fmtRevTick = (v: number) =>
     new Intl.NumberFormat(undefined, {
       style: 'currency',
-      currency: 'USD',
+      currency: getDisplayCurrency(),
       notation: Math.abs(v) >= 1000 ? 'compact' : 'standard',
       maximumFractionDigits: Math.abs(v) >= 1000 ? 1 : 0,
     }).format(v);

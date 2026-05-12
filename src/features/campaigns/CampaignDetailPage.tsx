@@ -25,6 +25,7 @@ import {
   ComposedChart,
   Legend,
   Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -38,7 +39,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { fmtMoney } from '@/lib/format';
+import { fmtMoney, fmtMoneyCompact } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { reportsApi } from '@/features/reports/api';
@@ -174,6 +175,11 @@ function DetailBody({
 
       <KpiGrid summary={data.summary} previous={data.previous} deltas={data.deltas} />
 
+      {/* Google Ads native metrics KPIs */}
+      {data.summary.gads_clicks > 0 && (
+        <GadsKpiGrid summary={data.summary} />
+      )}
+
       <BestWorstStrip best={data.best_day} worst={data.worst_day} />
 
       <RevenueSpendChart series={data.series} />
@@ -191,6 +197,17 @@ function DetailBody({
         spendDays={data.spend_days}
         series={data.series}
       />
+
+      {/* Google Ads trend charts */}
+      {data.summary.gads_clicks > 0 && (
+        <>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <GadsCpcTrendChart series={data.series} />
+            <GadsCtrTrendChart series={data.series} />
+          </div>
+          <GadsClicksImpressionsChart series={data.series} />
+        </>
+      )}
 
       <NameEditorCard
         campaignId={campaignId}
@@ -439,9 +456,7 @@ function RevenueSpendChart({ series }: { series: CampaignDetailDailyPoint[] }) {
                 tick={{ fill: axis, fontSize: 11 }}
                 stroke={grid}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(Number(v))
-                }
+                tickFormatter={(v) => fmtMoneyCompact(Number(v))}
                 width={56}
               />
               <YAxis
@@ -498,9 +513,7 @@ function DailyProfitChart({ series }: { series: CampaignDetailDailyPoint[] }) {
                 tick={{ fill: axis, fontSize: 11 }}
                 stroke={grid}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(Number(v))
-                }
+                tickFormatter={(v) => fmtMoneyCompact(Number(v))}
                 width={56}
               />
               <Tooltip
@@ -704,7 +717,7 @@ function SpendEditorCard({
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className="min-w-[10rem]">
-            <label className="label mb-1 text-xs">Spend (USD)</label>
+            <label className="label mb-1 text-xs">Spend</label>
             <Input type="number" step="0.01" min="0" value={spend} onChange={(e) => setSpend(e.target.value)} placeholder="0.00" />
           </div>
           <Button type="submit" size="sm" disabled={mutation.isPending}>
@@ -870,3 +883,223 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     </div>
   );
 }
+
+// ── Google Ads KPI band ─────────────────────────────────────────────
+
+function GadsKpiGrid({ summary }: { summary: CampaignDetailSummary }) {
+  return (
+    <Card>
+      <CardHeader
+        title={<span className="inline-flex items-center gap-2 text-blue-600 dark:text-blue-400">📊 Google Ads Metrics</span>}
+        subtitle="Native metrics from Google Ads API — separate from your internal tracking data."
+      />
+      <CardBody>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-500/10">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">G-Clicks</div>
+            <div className="mt-1 text-xl font-semibold tabular-nums text-blue-800 dark:text-blue-200">{fmtCount(summary.gads_clicks)}</div>
+          </div>
+          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-500/10">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">Impressions</div>
+            <div className="mt-1 text-xl font-semibold tabular-nums text-blue-800 dark:text-blue-200">{fmtCount(summary.gads_impressions)}</div>
+          </div>
+          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-500/10">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">CTR</div>
+            <div className="mt-1 text-xl font-semibold tabular-nums text-blue-800 dark:text-blue-200">{fmtPct(summary.gads_ctr)}</div>
+          </div>
+          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-500/10">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">Avg CPC</div>
+            <div className="mt-1 text-xl font-semibold tabular-nums text-blue-800 dark:text-blue-200">{fmtMoney(summary.gads_cpc)}</div>
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+// ── Google Ads CPC Trend ────────────────────────────────────────────
+
+function GadsCpcTrendChart({ series }: { series: CampaignDetailDailyPoint[] }) {
+  const { resolved } = useTheme();
+  const dark = resolved === 'dark';
+  const grid = dark ? '#262626' : '#e2e8f0';
+  const axis = dark ? '#a3a3a3' : '#64748b';
+  const lineColor = dark ? '#60a5fa' : '#2563eb';
+
+  const data = series.map((p) => ({
+    date: p.date,
+    cpc: p.gads_cpc > 0 ? p.gads_cpc : null,
+  }));
+
+  return (
+    <Card>
+      <CardHeader
+        title="Google Ads CPC trend"
+        subtitle="Average cost per click from Google Ads. Lower is better — look for days where CPC spikes to optimise bids."
+      />
+      <CardBody className="p-0">
+        <div className="h-64 w-full px-2 pb-2 pt-3 sm:px-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+              <XAxis dataKey="date" tick={{ fill: axis, fontSize: 11 }} tickFormatter={fmtDateShort} stroke={grid} tickLine={false} />
+              <YAxis
+                tick={{ fill: axis, fontSize: 11 }}
+                stroke={grid}
+                tickLine={false}
+                tickFormatter={(v) => fmtMoneyCompact(Number(v))}
+                width={56}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: dark ? '#171717' : '#ffffff',
+                  border: `1px solid ${dark ? '#404040' : '#e2e8f0'}`,
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+                labelFormatter={(d) => new Date(String(d)).toDateString()}
+                formatter={(value) => [value == null ? '—' : fmtMoney(Number(value)), 'CPC']}
+              />
+              <Line
+                type="monotone"
+                dataKey="cpc"
+                name="CPC"
+                stroke={lineColor}
+                strokeWidth={2}
+                dot={{ r: 2 }}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+// ── Google Ads CTR Trend ────────────────────────────────────────────
+
+function GadsCtrTrendChart({ series }: { series: CampaignDetailDailyPoint[] }) {
+  const { resolved } = useTheme();
+  const dark = resolved === 'dark';
+  const grid = dark ? '#262626' : '#e2e8f0';
+  const axis = dark ? '#a3a3a3' : '#64748b';
+  const lineColor = dark ? '#34d399' : '#059669';
+
+  const data = series.map((p) => ({
+    date: p.date,
+    ctr: p.gads_ctr > 0 ? p.gads_ctr * 100 : null,
+  }));
+
+  return (
+    <Card>
+      <CardHeader
+        title="Google Ads CTR trend"
+        subtitle="Click-through rate from Google Ads. Higher means your ads are more compelling to the audience."
+      />
+      <CardBody className="p-0">
+        <div className="h-64 w-full px-2 pb-2 pt-3 sm:px-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+              <XAxis dataKey="date" tick={{ fill: axis, fontSize: 11 }} tickFormatter={fmtDateShort} stroke={grid} tickLine={false} />
+              <YAxis
+                tick={{ fill: axis, fontSize: 11 }}
+                stroke={grid}
+                tickLine={false}
+                tickFormatter={(v) => `${Number(v).toFixed(1)}%`}
+                width={44}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: dark ? '#171717' : '#ffffff',
+                  border: `1px solid ${dark ? '#404040' : '#e2e8f0'}`,
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+                labelFormatter={(d) => new Date(String(d)).toDateString()}
+                formatter={(value) => [value == null ? '—' : `${Number(value).toFixed(2)}%`, 'CTR']}
+              />
+              <Line
+                type="monotone"
+                dataKey="ctr"
+                name="CTR"
+                stroke={lineColor}
+                strokeWidth={2}
+                dot={{ r: 2 }}
+                connectNulls={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+// ── Google Ads Clicks & Impressions chart ────────────────────────────
+
+function GadsClicksImpressionsChart({ series }: { series: CampaignDetailDailyPoint[] }) {
+  const { resolved } = useTheme();
+  const dark = resolved === 'dark';
+  const grid = dark ? '#262626' : '#e2e8f0';
+  const axis = dark ? '#a3a3a3' : '#64748b';
+  const clicksColor = dark ? '#60a5fa' : '#2563eb';
+  const impressionsColor = dark ? '#fbbf24' : '#d97706';
+
+  const data = series.map((p) => ({
+    date: p.date,
+    clicks: p.gads_clicks,
+    impressions: p.gads_impressions,
+  }));
+
+  return (
+    <Card>
+      <CardHeader
+        title="Google Ads clicks vs impressions"
+        subtitle="Daily click and impression volumes from Google Ads. The gap between the two lines is your CTR."
+      />
+      <CardBody className="p-0">
+        <div className="h-72 w-full px-2 pb-2 pt-3 sm:px-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+              <XAxis dataKey="date" tick={{ fill: axis, fontSize: 11 }} tickFormatter={fmtDateShort} stroke={grid} tickLine={false} />
+              <YAxis
+                yAxisId="impressions"
+                tick={{ fill: axis, fontSize: 11 }}
+                stroke={grid}
+                tickLine={false}
+                tickFormatter={(v) => fmtCount(Number(v))}
+                width={56}
+              />
+              <YAxis
+                yAxisId="clicks"
+                orientation="right"
+                tick={{ fill: axis, fontSize: 11 }}
+                stroke={grid}
+                tickLine={false}
+                tickFormatter={(v) => fmtCount(Number(v))}
+                width={48}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: dark ? '#171717' : '#ffffff',
+                  border: `1px solid ${dark ? '#404040' : '#e2e8f0'}`,
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+                labelFormatter={(d) => new Date(String(d)).toDateString()}
+                formatter={(value, name) => [fmtCount(Number(value)), String(name)]}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, color: axis }} iconType="circle" />
+              <Bar yAxisId="impressions" dataKey="impressions" name="Impressions" fill={impressionsColor} opacity={0.3} />
+              <Line yAxisId="clicks" type="monotone" dataKey="clicks" name="Clicks" stroke={clicksColor} strokeWidth={2} dot={{ r: 2 }} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </CardBody>
+    </Card>
+  );
+}
+

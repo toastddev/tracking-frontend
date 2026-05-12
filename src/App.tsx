@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { LoginPage } from '@/features/auth/LoginPage';
@@ -17,8 +19,24 @@ import { PostbackReportDetailPage } from '@/features/reports/PostbackReportDetai
 import { CampaignReportsPage } from '@/features/campaigns/CampaignReportsPage';
 import { CampaignDetailPage } from '@/features/campaigns/CampaignDetailPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { configApi } from '@/features/reports/api';
+import { setDisplayCurrency } from '@/lib/format';
 
 export default function App() {
+  // Fetch display currency on app boot — drives all fmtMoney calls.
+  const configQuery = useQuery({
+    queryKey: ['app-config'],
+    queryFn: () => configApi.get(),
+    staleTime: 5 * 60 * 1000, // re-fetch every 5 min
+    retry: 2,
+  });
+
+  useEffect(() => {
+    if (configQuery.data?.display_currency) {
+      setDisplayCurrency(configQuery.data.display_currency);
+    }
+  }, [configQuery.data]);
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

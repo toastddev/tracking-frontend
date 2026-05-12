@@ -524,6 +524,11 @@ export interface CampaignDailyPoint {
   revenue: number;
   spend: number;
   profit: number;
+  // Google Ads native metrics
+  gads_clicks: number;
+  gads_impressions: number;
+  gads_ctr: number;
+  gads_cpc: number;
 }
 
 export interface CampaignReportSummary {
@@ -550,6 +555,11 @@ export interface CampaignReportSummary {
   spend_coverage: number;
   offers: string[];
   series: CampaignDailyPoint[];
+  // Google Ads native metrics
+  gads_clicks: number;
+  gads_impressions: number;
+  gads_ctr: number;
+  gads_cpc: number;
 }
 
 export interface CampaignInsight {
@@ -597,6 +607,11 @@ export interface CampaignDetailDailyPoint {
   spend: number;
   profit: number;
   roas: number;
+  // Google Ads native metrics
+  gads_clicks: number;
+  gads_impressions: number;
+  gads_ctr: number;
+  gads_cpc: number;
 }
 
 export interface CampaignDetailSummary {
@@ -617,6 +632,11 @@ export interface CampaignDetailSummary {
   roas: number;
   roi: number;
   approval_rate: number;
+  // Google Ads native metrics
+  gads_clicks: number;
+  gads_impressions: number;
+  gads_ctr: number;
+  gads_cpc: number;
 }
 
 export interface CampaignDetailDeltas {

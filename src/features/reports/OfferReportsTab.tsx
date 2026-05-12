@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { CenteredSpinner, Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
-import { fmtMoney } from '@/lib/format';
+import { fmtMoney, fmtMoneyCompact } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import type { OfferReportSummary } from '@/types';

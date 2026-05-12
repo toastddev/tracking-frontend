@@ -40,7 +40,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { fmtMoney } from '@/lib/format';
+import { fmtMoney, fmtMoneyCompact, getDisplayCurrency } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { reportsApi } from '@/features/reports/api';
@@ -99,7 +99,8 @@ function fmtDateShort(d: string): string {
 
 type SortKey =
   | 'revenue' | 'spend' | 'profit' | 'roas' | 'roi'
-  | 'clicks' | 'conversions' | 'cvr' | 'epc' | 'name';
+  | 'clicks' | 'conversions' | 'cvr' | 'epc' | 'name'
+  | 'gads_clicks' | 'gads_impressions' | 'gads_ctr' | 'gads_cpc';
 
 const SORT_LABEL: Record<SortKey, string> = {
   name: 'Campaign',
@@ -112,6 +113,10 @@ const SORT_LABEL: Record<SortKey, string> = {
   roi: 'ROI',
   cvr: 'CVR',
   epc: 'EPC',
+  gads_clicks: 'G-Clicks',
+  gads_impressions: 'Impressions',
+  gads_ctr: 'G-CTR',
+  gads_cpc: 'G-CPC',
 };
 
 export function CampaignReportsPage() {
@@ -424,6 +429,10 @@ function Body({
         case 'roi': return dir * (a.roi - b.roi);
         case 'cvr': return dir * (a.cvr - b.cvr);
         case 'epc': return dir * (a.epc - b.epc);
+        case 'gads_clicks': return dir * (a.gads_clicks - b.gads_clicks);
+        case 'gads_impressions': return dir * (a.gads_impressions - b.gads_impressions);
+        case 'gads_ctr': return dir * (a.gads_ctr - b.gads_ctr);
+        case 'gads_cpc': return dir * (a.gads_cpc - b.gads_cpc);
         case 'revenue':
         default: return dir * (a.revenue - b.revenue);
       }
@@ -464,6 +473,7 @@ function buildDailyAggregate(campaigns: CampaignReportSummary[]): CampaignDailyP
   const dates = campaigns[0]!.series.map((p) => p.date);
   return dates.map((date, i) => {
     let clicks = 0, postbacks = 0, conversions = 0, revenue = 0, spend = 0;
+    let gads_clicks = 0, gads_impressions = 0, gads_cpc_total = 0;
     for (const c of campaigns) {
       const p = c.series[i];
       if (!p) continue;
@@ -472,8 +482,17 @@ function buildDailyAggregate(campaigns: CampaignReportSummary[]): CampaignDailyP
       conversions += p.conversions;
       revenue += p.revenue;
       spend += p.spend;
+      gads_clicks += p.gads_clicks;
+      gads_impressions += p.gads_impressions;
+      // cpc is average, so we accumulate total spend then divide
+      gads_cpc_total += (p.gads_clicks * p.gads_cpc);
     }
-    return { date, clicks, postbacks, conversions, revenue, spend, profit: revenue - spend };
+    const gads_ctr = gads_impressions > 0 ? gads_clicks / gads_impressions : 0;
+    const gads_cpc = gads_clicks > 0 ? gads_cpc_total / gads_clicks : 0;
+    return { 
+      date, clicks, postbacks, conversions, revenue, spend, profit: revenue - spend,
+      gads_clicks, gads_impressions, gads_ctr, gads_cpc
+    };
   });
 }
 
@@ -627,9 +646,7 @@ function RevenueVsSpendChart({ series }: { series: CampaignDailyPoint[] }) {
                 tick={{ fill: axis, fontSize: 11 }}
                 stroke={grid}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(Number(v))
-                }
+                tickFormatter={(v) => fmtMoneyCompact(Number(v))}
                 width={56}
               />
               <Tooltip
@@ -677,9 +694,7 @@ function DailyProfitChart({ series }: { series: CampaignDailyPoint[] }) {
                 tick={{ fill: axis, fontSize: 11 }}
                 stroke={grid}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(Number(v))
-                }
+                tickFormatter={(v) => fmtMoneyCompact(Number(v))}
                 width={56}
               />
               <Tooltip
@@ -789,18 +804,25 @@ function CampaignsTable({
           <Table>
             <THead>
               <TR>
-                <SortHeader label={SORT_LABEL.name} active={sortKey==='name'} dir={sortDir} onClick={() => onSort('name')} />
-                <SortHeader label={SORT_LABEL.clicks} active={sortKey==='clicks'} dir={sortDir} onClick={() => onSort('clicks')} align="right" />
-                <SortHeader label={SORT_LABEL.conversions} active={sortKey==='conversions'} dir={sortDir} onClick={() => onSort('conversions')} align="right" />
-                <SortHeader label={SORT_LABEL.cvr} active={sortKey==='cvr'} dir={sortDir} onClick={() => onSort('cvr')} align="right" />
-                <SortHeader label={SORT_LABEL.epc} active={sortKey==='epc'} dir={sortDir} onClick={() => onSort('epc')} align="right" />
-                <SortHeader label={SORT_LABEL.revenue} active={sortKey==='revenue'} dir={sortDir} onClick={() => onSort('revenue')} align="right" />
-                <SortHeader label={SORT_LABEL.spend} active={sortKey==='spend'} dir={sortDir} onClick={() => onSort('spend')} align="right" />
-                <SortHeader label={SORT_LABEL.profit} active={sortKey==='profit'} dir={sortDir} onClick={() => onSort('profit')} align="right" />
-                <SortHeader label={SORT_LABEL.roas} active={sortKey==='roas'} dir={sortDir} onClick={() => onSort('roas')} align="right" />
-                <SortHeader label={SORT_LABEL.roi} active={sortKey==='roi'} dir={sortDir} onClick={() => onSort('roi')} align="right" />
-                <TH>Trend</TH>
-                <TH className="w-8" aria-label="Open detail" />
+                <TH rowSpan={2} className="align-bottom">Campaign</TH>
+                <TH rowSpan={2} className="text-right align-bottom">Clicks</TH>
+                <TH rowSpan={2} className="text-right align-bottom">Conv</TH>
+                <TH rowSpan={2} className="text-right align-bottom">CVR</TH>
+                <TH rowSpan={2} className="text-right align-bottom">EPC</TH>
+                <TH rowSpan={2} className="text-right align-bottom">Revenue</TH>
+                <TH rowSpan={2} className="text-right align-bottom">Spend</TH>
+                <TH rowSpan={2} className="text-right align-bottom">Profit</TH>
+                <TH rowSpan={2} className="text-right align-bottom">ROAS</TH>
+                <TH rowSpan={2} className="text-right align-bottom">ROI</TH>
+                <TH colSpan={4} className="text-center border-b-0 text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">GADS</TH>
+                <TH rowSpan={2} className="align-bottom">Trend</TH>
+                <TH rowSpan={2} className="w-8 align-bottom" aria-label="Open detail" />
+              </TR>
+              <TR>
+                <SortHeader label={SORT_LABEL.gads_clicks} active={sortKey==='gads_clicks'} dir={sortDir} onClick={() => onSort('gads_clicks')} align="right" />
+                <SortHeader label={SORT_LABEL.gads_impressions} active={sortKey==='gads_impressions'} dir={sortDir} onClick={() => onSort('gads_impressions')} align="right" />
+                <SortHeader label={SORT_LABEL.gads_ctr} active={sortKey==='gads_ctr'} dir={sortDir} onClick={() => onSort('gads_ctr')} align="right" />
+                <SortHeader label={SORT_LABEL.gads_cpc} active={sortKey==='gads_cpc'} dir={sortDir} onClick={() => onSort('gads_cpc')} align="right" />
               </TR>
             </THead>
             <TBody>
@@ -872,6 +894,11 @@ function CampaignRow({ row, onOpen }: { row: CampaignReportSummary; onOpen: () =
         </span>
       </TD>
       <TD className="text-right tabular-nums">{row.spend > 0 ? fmtRoi(row.roi) : '—'}</TD>
+      {/* GADS columns */}
+      <TD className="text-right tabular-nums text-blue-700 dark:text-blue-300">{row.gads_clicks > 0 ? fmtCount(row.gads_clicks) : '—'}</TD>
+      <TD className="text-right tabular-nums text-blue-700 dark:text-blue-300">{row.gads_impressions > 0 ? fmtCount(row.gads_impressions) : '—'}</TD>
+      <TD className="text-right tabular-nums text-blue-700 dark:text-blue-300">{row.gads_ctr > 0 ? fmtPct(row.gads_ctr) : '—'}</TD>
+      <TD className="text-right tabular-nums text-blue-700 dark:text-blue-300">{row.gads_cpc > 0 ? fmtMoney(row.gads_cpc) : '—'}</TD>
       <TD>
         <ProfitSparkline series={row.series} />
       </TD>
