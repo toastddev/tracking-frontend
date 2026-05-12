@@ -37,6 +37,39 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
   return BASE ? url.toString() : url.pathname + url.search;
 }
 
+// Authed download for binary / CSV endpoints. Returns the response so the
+// caller can read the blob + headers (e.g. Content-Disposition, X-Row-Count).
+// Same auth + 401 handling as `api`, but doesn't try to JSON-parse the body.
+export async function apiDownload(
+  path: string,
+  opts: RequestOptions = {},
+): Promise<Response> {
+  const token = auth.getToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(buildUrl(path, opts.query), {
+    method: opts.method ?? 'GET',
+    headers,
+    signal: opts.signal,
+  });
+
+  if (res.status === 401) {
+    auth.clear();
+    throw new ApiError(401, 'unauthorized', 'unauthorized');
+  }
+  if (!res.ok) {
+    // Try to surface a JSON error body if the server sent one.
+    const ct = res.headers.get('content-type') ?? '';
+    const data = ct.includes('application/json') ? await res.json().catch(() => null) : null;
+    const code = data && typeof data === 'object' && 'error' in data
+      ? String((data as { error: unknown }).error)
+      : 'request_failed';
+    throw new ApiError(res.status, code, code, data);
+  }
+  return res;
+}
+
 export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const token = auth.getToken();
   const headers: Record<string, string> = { Accept: 'application/json' };

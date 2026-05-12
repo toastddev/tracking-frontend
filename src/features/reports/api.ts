@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { api, apiDownload } from '@/lib/api';
 import type {
   CampaignDetailResponse,
   CampaignReportsResponse,
@@ -271,6 +271,34 @@ export const clicksApi = {
     return api<{ click: ClickRecord; conversions: ConversionRecord[] }>(
       `/api/clicks/${encodeURIComponent(id)}`
     );
+  },
+  // Server-side CSV export. One Firestore query, response streamed back as a
+  // `text/csv` body. Returned headers carry the row count and a truncated
+  // flag so the UI can warn the operator if the cap was hit.
+  async exportCsv(params: Omit<ClickListParams, 'cursor' | 'limit'>): Promise<{
+    blob: Blob;
+    filename: string;
+    rowCount: number;
+    truncated: boolean;
+  }> {
+    const res = await apiDownload('/api/clicks/export', {
+      query: {
+        from: params.from,
+        to: params.to,
+        offer_id: params.offer_id,
+        aff_id: params.aff_id,
+      },
+    });
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') ?? '';
+    const match = /filename="?([^"]+)"?/.exec(disposition);
+    const filename = match?.[1] ?? `clicks_${Date.now()}.csv`;
+    return {
+      blob,
+      filename,
+      rowCount: Number(res.headers.get('x-row-count') ?? 0),
+      truncated: res.headers.get('x-export-truncated') === '1',
+    };
   },
 };
 
