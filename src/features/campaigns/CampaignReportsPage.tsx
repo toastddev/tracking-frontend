@@ -11,6 +11,7 @@ import {
   Info,
   Inbox,
   Megaphone,
+  Search,
   TrendingDown,
   TrendingUp,
   CloudDownload,
@@ -40,6 +41,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
 import { fmtInr, fmtInrExact } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
@@ -423,6 +425,9 @@ function Body({
   onSort: (k: SortKey) => void;
   onOpenCampaign: (id: string) => void;
 }) {
+  const [drillMetric, setDrillMetric] = useState<DrilldownMetric | null>(null);
+  const [search, setSearch] = useState('');
+
   const sorted = useMemo(() => {
     const dir = sortDir === 'desc' ? -1 : 1;
     const arr = data.campaigns.slice();
@@ -448,6 +453,18 @@ function Body({
     return arr;
   }, [data.campaigns, sortKey, sortDir]);
 
+  // Filtering for the per-campaign metrics table only — drill-down modal still
+  // uses the full unfiltered dataset because the operator opened it to compare
+  // *all* campaigns by a given metric.
+  const filteredSorted = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((c) =>
+      c.campaign_id.toLowerCase().includes(q) ||
+      (c.campaign_name ?? '').toLowerCase().includes(q),
+    );
+  }, [sorted, search]);
+
   const dailyAggregate = useMemo(() => buildDailyAggregate(data.campaigns), [data.campaigns]);
 
   void range;
@@ -456,7 +473,7 @@ function Body({
     <div className="space-y-6">
       <InsightsBand insights={data.insights} />
 
-      <KpiBand totals={data.totals} />
+      <KpiBand totals={data.totals} onDrill={setDrillMetric} />
 
       <RevenueVsSpendChart series={dailyAggregate} />
 
@@ -466,11 +483,22 @@ function Body({
       </div>
 
       <CampaignsTable
-        campaigns={sorted}
+        campaigns={filteredSorted}
+        totalCampaignCount={sorted.length}
+        search={search}
+        onSearchChange={setSearch}
         sortKey={sortKey}
         sortDir={sortDir}
         onSort={onSort}
         onOpen={onOpenCampaign}
+      />
+
+      <MetricDrilldownModal
+        metric={drillMetric}
+        campaigns={data.campaigns}
+        totals={data.totals}
+        onClose={() => setDrillMetric(null)}
+        onOpenCampaign={(id) => { setDrillMetric(null); onOpenCampaign(id); }}
       />
     </div>
   );
@@ -545,7 +573,13 @@ function InsightBanner({ insight }: { insight: CampaignInsight }) {
 
 // ── KPI band ────────────────────────────────────────────────────────
 
-function KpiBand({ totals }: { totals: CampaignReportsResponse['totals'] }) {
+function KpiBand({
+  totals,
+  onDrill,
+}: {
+  totals: CampaignReportsResponse['totals'];
+  onDrill: (m: DrilldownMetric) => void;
+}) {
   const profitTone = totals.profit > 0 ? 'positive' : totals.profit < 0 ? 'negative' : 'neutral';
   const hasGads = totals.gads_impressions > 0 || totals.gads_clicks > 0;
   return (
@@ -557,6 +591,7 @@ function KpiBand({ totals }: { totals: CampaignReportsResponse['totals'] }) {
           tooltip={fmtInrExact(totals.revenue)}
           sub={`${fmtCount(totals.clicks)} clicks`}
           highlight
+          onClick={() => onDrill('revenue')}
         />
         <Kpi
           label="Ad spend"
@@ -567,6 +602,7 @@ function KpiBand({ totals }: { totals: CampaignReportsResponse['totals'] }) {
               ? `${(totals.spend_coverage * 100).toFixed(0)}% coverage`
               : 'all campaigns'
           }
+          onClick={() => onDrill('spend')}
         />
         <Kpi
           label="Profit"
@@ -578,6 +614,7 @@ function KpiBand({ totals }: { totals: CampaignReportsResponse['totals'] }) {
               : 'spend not entered'
           }
           tone={profitTone}
+          onClick={() => onDrill('profit')}
         />
         <Kpi
           label="ROAS"
@@ -588,12 +625,14 @@ function KpiBand({ totals }: { totals: CampaignReportsResponse['totals'] }) {
             : totals.spend > 0 ? 'underwater' : 'no spend'
           }
           tone={totals.roas >= 1.5 ? 'positive' : totals.roas > 0 && totals.roas < 1 ? 'negative' : 'neutral'}
+          onClick={() => onDrill('roas')}
         />
-        <Kpi label="ROI" value={fmtRoi(totals.roi)} sub={`avg across ${totals.campaigns} campaigns`} />
+        <Kpi label="ROI" value={fmtRoi(totals.roi)} sub={`avg across ${totals.campaigns} campaigns`} onClick={() => onDrill('roi')} />
         <Kpi
           label="Conversions"
           value={fmtCount(totals.conversions)}
           sub={totals.clicks > 0 ? `${fmtPct(totals.cvr)} CVR · ${fmtInr(totals.epc)} EPC` : '—'}
+          onClick={() => onDrill('conversions')}
         />
       </div>
       {hasGads && (
@@ -602,22 +641,26 @@ function KpiBand({ totals }: { totals: CampaignReportsResponse['totals'] }) {
             label="GADS Clicks"
             value={fmtCount(totals.gads_clicks)}
             sub="from Google Ads"
+            onClick={() => onDrill('gads_clicks')}
           />
           <Kpi
             label="GADS CTR"
             value={fmtPct(totals.gads_ctr)}
             sub={`${fmtCount(totals.gads_impressions)} impressions`}
+            onClick={() => onDrill('gads_ctr')}
           />
           <Kpi
             label="GADS Impressions"
             value={fmtCount(totals.gads_impressions)}
             sub="from Google Ads"
+            onClick={() => onDrill('gads_impressions')}
           />
           <Kpi
             label="GADS CPC"
             value={fmtInr(totals.gads_cpc)}
             tooltip={fmtInrExact(totals.gads_cpc)}
             sub={`weighted across ${totals.campaigns} campaigns`}
+            onClick={() => onDrill('gads_cpc')}
           />
         </div>
       )}
@@ -626,7 +669,7 @@ function KpiBand({ totals }: { totals: CampaignReportsResponse['totals'] }) {
 }
 
 function Kpi({
-  label, value, sub, tooltip, highlight, tone,
+  label, value, sub, tooltip, highlight, tone, onClick,
 }: {
   label: string;
   value: string;
@@ -634,12 +677,40 @@ function Kpi({
   tooltip?: string;
   highlight?: boolean;
   tone?: 'positive' | 'negative' | 'neutral';
+  onClick?: () => void;
 }) {
+  const interactive = !!onClick;
   return (
-    <Card className={highlight ? 'ring-1 ring-brand-300/50 dark:ring-brand-500/30' : undefined}>
-      <div className="p-4">
-        <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
-          {label}
+    <Card
+      className={cn(
+        highlight && 'ring-1 ring-brand-300/50 dark:ring-brand-500/30',
+        interactive && 'cursor-pointer transition hover:shadow-md hover:ring-1 hover:ring-brand-400/40 dark:hover:ring-brand-400/30',
+      )}
+    >
+      <div
+        role={interactive ? 'button' : undefined}
+        tabIndex={interactive ? 0 : undefined}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (!interactive) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick?.();
+          }
+        }}
+        aria-label={interactive ? `Show ${label} breakdown by campaign` : undefined}
+        className={cn(
+          'p-4',
+          interactive && 'rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60',
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+            {label}
+          </div>
+          {interactive && (
+            <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-neutral-500" aria-hidden />
+          )}
         </div>
         <div
           className={cn(
@@ -829,24 +900,56 @@ function RoasTrendChart({ series }: { series: CampaignDailyPoint[] }) {
 // ── Table ────────────────────────────────────────────────────────────
 
 function CampaignsTable({
-  campaigns, sortKey, sortDir, onSort, onOpen,
+  campaigns, totalCampaignCount, search, onSearchChange, sortKey, sortDir, onSort, onOpen,
 }: {
   campaigns: CampaignReportSummary[];
+  totalCampaignCount: number;
+  search: string;
+  onSearchChange: (s: string) => void;
   sortKey: SortKey;
   sortDir: 'desc' | 'asc';
   onSort: (k: SortKey) => void;
   onOpen: (id: string) => void;
 }) {
+  const isSearching = search.trim().length > 0;
   return (
     <Card>
       <CardHeader
         title="Per-campaign metrics"
         subtitle="Click a row to drill into a campaign. Edit per-day spend on the detail page."
       />
+      <div className="border-b border-slate-200 px-4 py-2.5 dark:border-neutral-800">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-neutral-500" aria-hidden />
+            <Input
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search campaigns by name or ID…"
+              className="h-8 pl-8 text-xs"
+              aria-label="Search campaigns"
+            />
+          </div>
+          {isSearching && (
+            <>
+              <span className="text-[11px] text-slate-500 dark:text-neutral-400">
+                {campaigns.length} of {totalCampaignCount}
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => onSearchChange('')}>
+                <X className="h-3 w-3" /> Clear
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
       <div className="overflow-x-auto">
         {campaigns.length === 0 ? (
           <div className="px-5 py-10">
-            <EmptyState icon={<Inbox className="h-8 w-8" />} title="No campaigns" description="" />
+            <EmptyState
+              icon={<Inbox className="h-8 w-8" />}
+              title={isSearching ? `No campaigns match "${search}"` : 'No campaigns'}
+              description=""
+            />
           </div>
         ) : (
           <Table>
@@ -1028,6 +1131,167 @@ function SortLabel({
       {label}
       {active && <span className="text-[10px]">{dir === 'desc' ? '▼' : '▲'}</span>}
     </button>
+  );
+}
+
+// ── Metric drill-down modal ─────────────────────────────────────────
+//
+// Opened from the KPI band — sorts every campaign by the chosen metric and
+// shows the contribution + share of the total. Clicking a row jumps to the
+// per-campaign detail page so the operator can keep digging.
+
+type DrilldownMetric =
+  | 'revenue' | 'spend' | 'profit' | 'roas' | 'roi' | 'conversions'
+  | 'gads_clicks' | 'gads_impressions' | 'gads_ctr' | 'gads_cpc';
+
+type DrilldownFormat = 'inr' | 'count' | 'pct' | 'ratio_x' | 'roi_pct';
+
+interface DrilldownConfig {
+  label: string;
+  description: string;
+  pick: (c: CampaignReportSummary) => number;
+  format: DrilldownFormat;
+  // When true, sort ascending so worst-first surfaces (e.g. profit losers).
+  worstFirst?: boolean;
+  // When true, the metric is a ratio rather than a sum — show a "weighted"
+  // total instead of a simple sum, and skip the share column.
+  ratio?: boolean;
+}
+
+const DRILLDOWN_CONFIG: Record<DrilldownMetric, DrilldownConfig> = {
+  revenue: { label: 'Revenue', description: 'INR revenue per campaign across the selected window.', pick: (c) => c.revenue, format: 'inr' },
+  spend: { label: 'Ad spend', description: 'Spend (canonical INR) per campaign. Operator-entered or pulled from Google Ads.', pick: (c) => c.spend, format: 'inr' },
+  profit: { label: 'Profit', description: 'Revenue minus spend. Negative is a loss.', pick: (c) => c.profit, format: 'inr', worstFirst: false },
+  roas: { label: 'ROAS', description: 'Return on ad spend. Above 1× the campaign earns more than it costs.', pick: (c) => c.roas, format: 'ratio_x', ratio: true },
+  roi: { label: 'ROI', description: '(Revenue − Spend) / Spend, expressed as a percentage.', pick: (c) => c.roi, format: 'roi_pct', ratio: true },
+  conversions: { label: 'Conversions', description: 'Verified postbacks attributed to this campaign.', pick: (c) => c.conversions, format: 'count' },
+  gads_clicks: { label: 'GADS Clicks', description: 'Clicks reported by Google Ads (per campaign).', pick: (c) => c.gads_clicks ?? 0, format: 'count' },
+  gads_impressions: { label: 'GADS Impressions', description: 'Impressions reported by Google Ads.', pick: (c) => c.gads_impressions ?? 0, format: 'count' },
+  gads_ctr: { label: 'GADS CTR', description: 'Click-through rate (clicks / impressions).', pick: (c) => c.gads_ctr ?? 0, format: 'pct', ratio: true },
+  gads_cpc: { label: 'GADS CPC', description: 'Cost per click — spend divided by GAds clicks.', pick: (c) => c.gads_cpc ?? 0, format: 'inr', ratio: true },
+};
+
+function fmtMetric(v: number, f: DrilldownFormat): string {
+  if (!Number.isFinite(v)) return '—';
+  switch (f) {
+    case 'inr':      return fmtInr(v);
+    case 'count':    return fmtCount(v);
+    case 'pct':      return fmtPct(v);
+    case 'ratio_x':  return fmtRoas(v);
+    case 'roi_pct':  return fmtRoi(v);
+  }
+}
+
+function pickTotal(metric: DrilldownMetric, totals: CampaignReportsResponse['totals']): number {
+  switch (metric) {
+    case 'revenue':           return totals.revenue;
+    case 'spend':             return totals.spend;
+    case 'profit':            return totals.profit;
+    case 'roas':              return totals.roas;
+    case 'roi':               return totals.roi;
+    case 'conversions':       return totals.conversions;
+    case 'gads_clicks':       return totals.gads_clicks;
+    case 'gads_impressions':  return totals.gads_impressions;
+    case 'gads_ctr':          return totals.gads_ctr;
+    case 'gads_cpc':          return totals.gads_cpc;
+  }
+}
+
+function MetricDrilldownModal({
+  metric, campaigns, totals, onClose, onOpenCampaign,
+}: {
+  metric: DrilldownMetric | null;
+  campaigns: CampaignReportSummary[];
+  totals: CampaignReportsResponse['totals'];
+  onClose: () => void;
+  onOpenCampaign: (id: string) => void;
+}) {
+  const cfg = metric ? DRILLDOWN_CONFIG[metric] : null;
+
+  const rows = useMemo(() => {
+    if (!metric || !cfg) return [];
+    const arr = campaigns
+      .map((c) => ({ campaign: c, value: cfg.pick(c) }))
+      // Drop campaigns where the metric is meaningless (e.g. ROAS with no spend)
+      // for ratio metrics — keeps the table focused on real signal.
+      .filter((r) => !cfg.ratio || (r.campaign.spend > 0 || r.campaign.revenue > 0));
+    arr.sort((a, b) => (cfg.worstFirst ? a.value - b.value : b.value - a.value));
+    return arr;
+  }, [metric, cfg, campaigns]);
+
+  if (!metric || !cfg) return null;
+
+  const totalValue = pickTotal(metric, totals);
+  const showShare = !cfg.ratio && totalValue !== 0;
+
+  return (
+    <Modal
+      open={metric != null}
+      onClose={onClose}
+      size="lg"
+      title={
+        <div className="flex items-baseline gap-3">
+          <span>{cfg.label} by campaign</span>
+          <span className="text-xs font-normal text-slate-500 dark:text-neutral-400">
+            {fmtMetric(totalValue, cfg.format)} total · {rows.length} campaign{rows.length === 1 ? '' : 's'}
+          </span>
+        </div>
+      }
+    >
+      <p className="mb-3 text-xs text-slate-500 dark:text-neutral-400">{cfg.description}</p>
+      {rows.length === 0 ? (
+        <EmptyState icon={<Inbox className="h-8 w-8" />} title="No campaigns to show" description="" />
+      ) : (
+        <div className="max-h-[60vh] overflow-y-auto">
+          <Table>
+            <THead>
+              <TR>
+                <TH>Campaign</TH>
+                <TH className="text-right">{cfg.label}</TH>
+                {showShare && <TH className="text-right">Share</TH>}
+                <TH className="text-right">Spend</TH>
+                <TH className="text-right">Revenue</TH>
+              </TR>
+            </THead>
+            <TBody>
+              {rows.map(({ campaign, value }) => (
+                <TR
+                  key={campaign.campaign_id}
+                  className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-neutral-800/50"
+                  onClick={() => onOpenCampaign(campaign.campaign_id)}
+                >
+                  <TD>
+                    <div className="font-medium text-slate-800 dark:text-neutral-200">
+                      {campaign.campaign_name ?? campaign.campaign_id}
+                    </div>
+                    <div className="font-mono text-[11px] text-slate-500 dark:text-neutral-500">
+                      {campaign.campaign_id}
+                    </div>
+                  </TD>
+                  <TD
+                    className="text-right tabular-nums font-semibold"
+                    title={cfg.format === 'inr' ? fmtInrExact(value) : undefined}
+                  >
+                    {fmtMetric(value, cfg.format)}
+                  </TD>
+                  {showShare && (
+                    <TD className="text-right tabular-nums text-slate-600 dark:text-neutral-400">
+                      {totalValue !== 0 ? `${((value / totalValue) * 100).toFixed(1)}%` : '—'}
+                    </TD>
+                  )}
+                  <TD className="text-right tabular-nums" title={fmtInrExact(campaign.spend)}>
+                    {campaign.spend > 0 ? fmtInr(campaign.spend) : '—'}
+                  </TD>
+                  <TD className="text-right tabular-nums" title={fmtInrExact(campaign.revenue)}>
+                    {fmtInr(campaign.revenue)}
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+        </div>
+      )}
+    </Modal>
   );
 }
 

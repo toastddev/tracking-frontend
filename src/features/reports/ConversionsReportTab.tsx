@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, Inbox, RotateCcw } from 'lucide-react';
+import { Clock, Download, Inbox, RotateCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/Table';
 import { Pagination } from '@/components/ui/Pagination';
@@ -10,11 +10,16 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { fmtDateTime, fmtMoney, shortId } from '@/lib/format';
+import { csvTimestamp, downloadCsv, toCsv } from '@/lib/csv';
 import { ConversionDetailDrawer } from '../conversions/ConversionDetailDrawer';
 import { allConversionsApi } from './api';
 import type { ReportRange } from './ReportFilters';
 
 const PAGE_SIZE = 25;
+// Hard cap on rows pulled by "Download report" so a runaway export can't
+// hammer the API or blow up the browser tab.
+const DOWNLOAD_LIMIT = 10_000;
+const DOWNLOAD_PAGE_SIZE = 200;
 
 interface Props {
   range: ReportRange;
@@ -31,11 +36,18 @@ interface Props {
   /**
    * When true, render datetime-local inputs that override the parent `range`
    * for this card only. Lets an operator drill into a specific minute window
-   * without leaving the page.
+   * without leaving the page. Defaults to true — every conversions list is
+   * worth giving the operator a per-card date filter.
    */
   inlineDateTimeOverride?: boolean;
   /** When true, add a Click column with a link to the click detail page. */
   showClickColumn?: boolean;
+  /**
+   * When true, render a "Download CSV" button that walks every page of the
+   * current filters and writes a CSV. Defaults to true. Set false to suppress
+   * on embedded/drill-down mounts where a download would be redundant.
+   */
+  showDownload?: boolean;
 }
 
 // Convert ISO → `datetime-local` value (no TZ, minute precision). Mirrors the
@@ -52,8 +64,9 @@ export function ConversionsReportTab({
   verifiedOnly,
   fixedNetworkId,
   fixedOfferIds,
-  inlineDateTimeOverride,
+  inlineDateTimeOverride = true,
   showClickColumn,
+  showDownload = true,
 }: Props) {
   const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
   const [offerId, setOfferId] = useState('');
@@ -67,6 +80,9 @@ export function ConversionsReportTab({
   const [overrideFrom, setOverrideFrom] = useState<string>('');
   const [overrideTo, setOverrideTo] = useState<string>('');
   const [appliedOverride, setAppliedOverride] = useState<{ from: string; to: string } | null>(null);
+
+  const [downloading, setDownloading] = useState(false);
+  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
 
   // Reset paging whenever the parent range or the locked offer set changes —
   // otherwise a stale cursor from a wider window points into nothing.
@@ -130,10 +146,71 @@ export function ConversionsReportTab({
     setCursorStack([null]);
   }
 
+  // Walks every page (within DOWNLOAD_LIMIT) for the *currently applied*
+  // filters and writes a single CSV. Same cursor pagination as the table —
+  // just a bigger page size to amortise the round-trips.
+  async function downloadReport() {
+    setDownloadMsg(null);
+    setDownloading(true);
+    const allRows: Array<Record<string, unknown>> = [];
+    let nextCursor: string | null = null;
+    try {
+      do {
+        const page = await allConversionsApi.list({
+          from: effectiveFrom,
+          to: effectiveTo,
+          offer_id: appliedOfferId || undefined,
+          offer_ids: fixedOfferIds && fixedOfferIds.length > 0 ? fixedOfferIds : undefined,
+          network_id: appliedNetworkId || undefined,
+          verified: verifiedOnly ? true : undefined,
+          cursor: nextCursor ?? undefined,
+          limit: DOWNLOAD_PAGE_SIZE,
+        });
+        for (const c of page.items) allRows.push(c as unknown as Record<string, unknown>);
+        nextCursor = page.nextCursor ?? null;
+        if (allRows.length >= DOWNLOAD_LIMIT) {
+          setDownloadMsg(`Capped at ${DOWNLOAD_LIMIT.toLocaleString()} rows. Narrow the date range or filters for a smaller, complete export.`);
+          break;
+        }
+      } while (nextCursor);
+
+      const headers = [
+        'received_at', 'conversion_id', 'network_id', 'offer_id', 'click_id',
+        'status', 'verified', 'verification_reason', 'payout', 'currency',
+        'txn_id', 'network_timestamp', 'source',
+      ];
+      const rows = allRows.map((c) => [
+        c.created_at as string,
+        c.conversion_id as string,
+        (c.network_id as string) ?? '',
+        (c.offer_id as string) ?? '',
+        (c.click_id as string) ?? '',
+        (c.status as string) ?? '',
+        c.verified ? 'true' : 'false',
+        (c.verification_reason as string) ?? '',
+        typeof c.payout === 'number' ? c.payout : '',
+        (c.currency as string) ?? '',
+        (c.txn_id as string) ?? '',
+        (c.network_timestamp as string) ?? '',
+        (c.source as string) ?? '',
+      ]);
+      const csv = toCsv(headers, rows);
+      const stamp = csvTimestamp();
+      const net = appliedNetworkId ? `_${appliedNetworkId}` : '';
+      const off = appliedOfferId ? `_${appliedOfferId}` : '';
+      const kind = verifiedOnly ? 'conversions' : 'postbacks';
+      downloadCsv(`${kind}${net}${off}_${stamp}.csv`, csv);
+    } catch (e) {
+      setDownloadMsg(`Download failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   // Hide the single-offer text filter when the parent already locks the
   // offer set — would just be a confusing second control.
   const showOfferIdInput = !fixedOfferIds;
-  const showApplyBar = showOfferIdInput || !fixedNetworkId;
+  const showApplyBar = showOfferIdInput || !fixedNetworkId || showDownload;
 
   return (
     <div>
@@ -162,26 +239,50 @@ export function ConversionsReportTab({
             </div>
           )}
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={applyFilters}>Apply</Button>
-            {(appliedOfferId || (!fixedNetworkId && appliedNetworkId)) && (
+            {(showOfferIdInput || !fixedNetworkId) && (
+              <>
+                <Button size="sm" variant="secondary" onClick={applyFilters}>Apply</Button>
+                {(appliedOfferId || (!fixedNetworkId && appliedNetworkId)) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setOfferId('');
+                      if (!fixedNetworkId) {
+                        setNetworkId('');
+                        setAppliedNetworkId('');
+                      }
+                      setAppliedOfferId('');
+                      setCursorStack([null]);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+                {query.isFetching && <Spinner className="text-slate-400 dark:text-neutral-500" />}
+              </>
+            )}
+          </div>
+          {showDownload && (
+            <div className="ml-auto">
               <Button
                 size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setOfferId('');
-                  if (!fixedNetworkId) {
-                    setNetworkId('');
-                    setAppliedNetworkId('');
-                  }
-                  setAppliedOfferId('');
-                  setCursorStack([null]);
-                }}
+                variant="secondary"
+                onClick={downloadReport}
+                disabled={downloading || !query.data || query.data.items.length === 0}
+                title="Download every row matching the current filters as a CSV (capped at 10,000 rows)."
               >
-                Clear
+                {downloading ? <Spinner /> : <Download className="h-3.5 w-3.5" />}
+                {downloading ? 'Downloading…' : 'Download'}
               </Button>
-            )}
-            {query.isFetching && <Spinner className="text-slate-400 dark:text-neutral-500" />}
-          </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {downloadMsg && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          {downloadMsg}
         </div>
       )}
 
