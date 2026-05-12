@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useUrlSyncedDateRange } from '@/lib/dateRange';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { RefreshButton } from '@/features/reports/RefreshButton';
 import {
   AlertCircle,
   AlertTriangle,
@@ -13,7 +14,6 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
-  RefreshCw,
   Save,
 } from 'lucide-react';
 import {
@@ -38,7 +38,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { fmtMoney } from '@/lib/format';
+import { fmtInr, fmtInrExact } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { reportsApi } from '@/features/reports/api';
@@ -55,7 +55,17 @@ import type {
 } from '@/types';
 
 const fmtCount = (v: number) =>
-  new Intl.NumberFormat(undefined, { notation: v >= 10_000 ? 'compact' : 'standard' }).format(v);
+  new Intl.NumberFormat('en-IN', { notation: v >= 10_000 ? 'compact' : 'standard' }).format(v);
+
+function fmtInrCompactAxis(v: number): string {
+  if (!Number.isFinite(v)) return '—';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1_00_00_000) return `${sign}₹${(abs / 1_00_00_000).toFixed(1)}Cr`;
+  if (abs >= 1_00_000) return `${sign}₹${(abs / 1_00_000).toFixed(1)}L`;
+  if (abs >= 1_000) return `${sign}₹${(abs / 1_000).toFixed(1)}k`;
+  return `${sign}₹${abs.toFixed(0)}`;
+}
 
 const fmtPct = (v: number) => (v * 100).toFixed(2) + '%';
 
@@ -74,7 +84,7 @@ function fmtDeltaAbs(v: number | null, suffix = 'pp'): string {
 function fmtDeltaMoney(v: number | null): string {
   if (v == null || !Number.isFinite(v)) return '—';
   const sign = v > 0 ? '+' : '';
-  return `${sign}${fmtMoney(v)}`;
+  return `${sign}${fmtInr(v)}`;
 }
 
 function fmtRoas(v: number): string {
@@ -127,16 +137,9 @@ export function CampaignDetailPage() {
         }
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => qc.invalidateQueries({ queryKey: ['report-campaign-detail', id] })}
-              disabled={detailQuery.isFetching}
-              title="Refresh campaign data"
-            >
-              <RefreshCw className={cn('h-3.5 w-3.5', detailQuery.isFetching && 'animate-spin')} />
-              Refresh
-            </Button>
+            <RefreshButton
+              invalidateOnSuccess={[['report-campaign-detail', id]]}
+            />
             {detailQuery.data?.campaign.source && (
               <Badge tone={detailQuery.data.campaign.source === 'gad_campaignid' ? 'blue' : 'amber'}>
                 {detailQuery.data.campaign.source === 'gad_campaignid' ? 'Google Ads' : 'UTM'}
@@ -177,6 +180,8 @@ function DetailBody({
       <BestWorstStrip best={data.best_day} worst={data.worst_day} />
 
       <RevenueSpendChart series={data.series} />
+
+      <GadsMetricsSection summary={data.summary} series={data.series} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DailyProfitChart series={data.series} />
@@ -244,25 +249,28 @@ function KpiGrid({
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
       <Kpi
         label="Revenue"
-        value={fmtMoney(summary.revenue)}
+        value={fmtInr(summary.revenue)}
+        tooltip={fmtInrExact(summary.revenue)}
         deltaText={fmtDeltaPct(deltas.revenue_pct)}
         deltaSignal={deltas.revenue_pct}
-        prev={`vs ${fmtMoney(previous.revenue)}`}
+        prev={`vs ${fmtInr(previous.revenue)}`}
         highlight
       />
       <Kpi
         label="Spend"
-        value={fmtMoney(summary.spend)}
+        value={fmtInr(summary.spend)}
+        tooltip={fmtInrExact(summary.spend)}
         deltaText={fmtDeltaPct(deltas.spend_pct)}
         deltaSignal={deltas.spend_pct == null ? null : -deltas.spend_pct}
-        prev={`vs ${fmtMoney(previous.spend)}`}
+        prev={`vs ${fmtInr(previous.spend)}`}
       />
       <Kpi
         label="Profit"
-        value={summary.spend > 0 ? fmtMoney(summary.profit) : '—'}
+        value={summary.spend > 0 ? fmtInr(summary.profit) : '—'}
+        tooltip={summary.spend > 0 ? fmtInrExact(summary.profit) : undefined}
         deltaText={fmtDeltaMoney(deltas.profit_abs)}
         deltaSignal={deltas.profit_abs}
-        prev={`vs ${fmtMoney(previous.profit)}`}
+        prev={`vs ${fmtInr(previous.profit)}`}
         tone={summary.profit > 0 ? 'positive' : summary.profit < 0 ? 'negative' : 'neutral'}
       />
       <Kpi
@@ -293,7 +301,7 @@ function KpiGrid({
 }
 
 function Kpi({
-  label, value, deltaText, deltaSignal, prev, highlight, tone,
+  label, value, deltaText, deltaSignal, prev, highlight, tone, tooltip,
 }: {
   label: string;
   value: string;
@@ -302,6 +310,7 @@ function Kpi({
   prev: string;
   highlight?: boolean;
   tone?: 'positive' | 'negative' | 'neutral';
+  tooltip?: string;
 }) {
   const positive = deltaSignal != null && deltaSignal > 0;
   const negative = deltaSignal != null && deltaSignal < 0;
@@ -311,12 +320,15 @@ function Kpi({
         <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
           {label}
         </div>
-        <div className={cn(
-          'mt-1.5 text-2xl font-semibold tracking-tight tabular-nums',
-          tone === 'positive' && 'text-emerald-600 dark:text-emerald-400',
-          tone === 'negative' && 'text-red-600 dark:text-red-400',
-          !tone && (highlight ? 'text-brand-700 dark:text-brand-300' : 'text-slate-900 dark:text-neutral-100')
-        )}>
+        <div
+          className={cn(
+            'mt-1.5 text-2xl font-semibold tracking-tight tabular-nums',
+            tone === 'positive' && 'text-emerald-600 dark:text-emerald-400',
+            tone === 'negative' && 'text-red-600 dark:text-red-400',
+            !tone && (highlight ? 'text-brand-700 dark:text-brand-300' : 'text-slate-900 dark:text-neutral-100')
+          )}
+          title={tooltip}
+        >
           {value}
         </div>
         <div className="mt-1.5 flex items-center gap-1.5">
@@ -353,8 +365,8 @@ function BestWorstStrip({
           tone="positive"
           title="Best day"
           subtitle={fmtDateShort(best.date)}
-          headline={best.profit >= 0 ? `+${fmtMoney(best.profit)} profit` : `${fmtMoney(best.profit)} profit`}
-          detail={`${fmtMoney(best.revenue)} revenue on ${fmtMoney(best.spend)} spend`}
+          headline={best.profit >= 0 ? `+${fmtInr(best.profit)} profit` : `${fmtInr(best.profit)} profit`}
+          detail={`${fmtInr(best.revenue)} revenue on ${fmtInr(best.spend)} spend`}
         />
       )}
       {worst && (
@@ -362,8 +374,8 @@ function BestWorstStrip({
           tone={worst.profit >= 0 ? 'positive' : 'negative'}
           title="Worst day"
           subtitle={fmtDateShort(worst.date)}
-          headline={worst.profit >= 0 ? `+${fmtMoney(worst.profit)} profit` : `${fmtMoney(worst.profit)} loss`}
-          detail={`${fmtMoney(worst.revenue)} revenue on ${fmtMoney(worst.spend)} spend`}
+          headline={worst.profit >= 0 ? `+${fmtInr(worst.profit)} profit` : `${fmtInr(worst.profit)} loss`}
+          detail={`${fmtInr(worst.revenue)} revenue on ${fmtInr(worst.spend)} spend`}
         />
       )}
     </div>
@@ -439,10 +451,8 @@ function RevenueSpendChart({ series }: { series: CampaignDetailDailyPoint[] }) {
                 tick={{ fill: axis, fontSize: 11 }}
                 stroke={grid}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(Number(v))
-                }
-                width={56}
+                tickFormatter={(v) => fmtInrCompactAxis(Number(v))}
+                width={64}
               />
               <YAxis
                 yAxisId="roas"
@@ -463,7 +473,7 @@ function RevenueSpendChart({ series }: { series: CampaignDetailDailyPoint[] }) {
                 labelFormatter={(d) => new Date(String(d)).toDateString()}
                 formatter={(value, name) => {
                   if (name === 'ROAS') return [value == null ? '—' : `${Number(value).toFixed(2)}×`, 'ROAS'];
-                  return [fmtMoney(Number(value)), String(name)];
+                  return [fmtInrExact(Number(value)), String(name)];
                 }}
               />
               <Legend wrapperStyle={{ fontSize: 12, color: axis }} iconType="circle" />
@@ -498,10 +508,8 @@ function DailyProfitChart({ series }: { series: CampaignDetailDailyPoint[] }) {
                 tick={{ fill: axis, fontSize: 11 }}
                 stroke={grid}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(Number(v))
-                }
-                width={56}
+                tickFormatter={(v) => fmtInrCompactAxis(Number(v))}
+                width={64}
               />
               <Tooltip
                 contentStyle={{
@@ -511,7 +519,7 @@ function DailyProfitChart({ series }: { series: CampaignDetailDailyPoint[] }) {
                   fontSize: 12,
                 }}
                 labelFormatter={(d) => new Date(String(d)).toDateString()}
-                formatter={(value) => [fmtMoney(Number(value)), 'Profit']}
+                formatter={(value) => [fmtInrExact(Number(value)), 'Profit']}
               />
               <Bar dataKey="profit" radius={[2, 2, 0, 0]}>
                 {series.map((p, i) => (
@@ -550,7 +558,7 @@ function WeekdayBreakdownCard({ rows }: { rows: CampaignWeekdayBreakdown[] }) {
                   <div className="flex items-baseline justify-between text-xs">
                     <span className="font-medium text-slate-700 dark:text-neutral-200">{r.label}</span>
                     <span className="tabular-nums text-slate-500 dark:text-neutral-400">
-                      {fmtMoney(r.revenue)} · {fmtMoney(r.profit)} profit · {fmtCount(r.conversions)} conv ({(share * 100).toFixed(0)}%)
+                      {fmtInr(r.revenue)} · {fmtInr(r.profit)} profit · {fmtCount(r.conversions)} conv ({(share * 100).toFixed(0)}%)
                     </span>
                   </div>
                   <div className="mt-1 h-1.5 w-full rounded-full bg-slate-100 dark:bg-neutral-800">
@@ -615,7 +623,7 @@ function OffersBreakdownCard({
                   <TD className="text-right tabular-nums">{fmtCount(r.clicks)}</TD>
                   <TD className="text-right tabular-nums">{fmtCount(r.conversions)}</TD>
                   <TD className="text-right tabular-nums">{r.clicks > 0 ? fmtPct(r.cvr) : '—'}</TD>
-                  <TD className="text-right tabular-nums font-semibold text-slate-900 dark:text-neutral-100">{fmtMoney(r.revenue)}</TD>
+                  <TD className="text-right tabular-nums font-semibold text-slate-900 dark:text-neutral-100">{fmtInr(r.revenue)}</TD>
                   <TD className="text-right tabular-nums">
                     <div className="inline-flex items-center gap-2">
                       <span className="text-xs text-slate-500 dark:text-neutral-400">{(r.share_of_revenue * 100).toFixed(1)}%</span>
@@ -704,7 +712,7 @@ function SpendEditorCard({
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className="min-w-[10rem]">
-            <label className="label mb-1 text-xs">Spend (USD)</label>
+            <label className="label mb-1 text-xs">Spend (INR)</label>
             <Input type="number" step="0.01" min="0" value={spend} onChange={(e) => setSpend(e.target.value)} placeholder="0.00" />
           </div>
           <Button type="submit" size="sm" disabled={mutation.isPending}>
@@ -738,14 +746,14 @@ function SpendEditorCard({
                   return (
                     <TR key={d.date}>
                       <TD className="font-mono text-xs">{d.date}</TD>
-                      <TD className="text-right tabular-nums">{fmtMoney(d.spend)}</TD>
-                      <TD className="text-right tabular-nums">{fmtMoney(d.revenue)}</TD>
+                      <TD className="text-right tabular-nums">{fmtInr(d.spend)}</TD>
+                      <TD className="text-right tabular-nums">{fmtInr(d.revenue)}</TD>
                       <TD className={cn(
                         'text-right tabular-nums font-semibold',
                         profit > 0 ? 'text-emerald-600 dark:text-emerald-400'
                         : profit < 0 ? 'text-red-600 dark:text-red-400'
                         : ''
-                      )}>{fmtMoney(profit)}</TD>
+                      )}>{fmtInr(profit)}</TD>
                       <TD className="text-right tabular-nums">{fmtRoas(roas)}</TD>
                       <TD className="text-right">
                         <button
@@ -867,6 +875,189 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="flex items-baseline justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 dark:border-neutral-800">
       <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-neutral-400">{label}</span>
       <span className="min-w-0 truncate text-right text-slate-700 dark:text-neutral-200">{value}</span>
+    </div>
+  );
+}
+
+// ── GADS metrics section ────────────────────────────────────────────
+// Renders the Google Ads-side metrics for this campaign: KPI strip + daily
+// trend lines for clicks/impressions/CTR/CPC. All money in INR. When the
+// campaign has no GAds data in the window (e.g. utm_campaign-tagged
+// traffic) the section renders an explanatory empty state instead of an
+// empty chart.
+function GadsMetricsSection({
+  summary, series,
+}: { summary: CampaignDetailSummary; series: CampaignDetailDailyPoint[] }) {
+  const hasGads = summary.gads_impressions > 0 || summary.gads_clicks > 0;
+  return (
+    <Card>
+      <CardHeader
+        title="Google Ads metrics"
+        subtitle="Clicks, impressions, CTR and CPC pulled directly from Google Ads for this campaign. Synced when you press Sync Ads on the Campaigns page or run the orchestrated Refresh."
+      />
+      <CardBody className={hasGads ? 'space-y-5' : undefined}>
+        {!hasGads ? (
+          <EmptyState
+            title="No Google Ads data for this campaign in this window"
+            description="Either the campaign is tagged with utm_campaign (not Google Ads), or no GAds sync has run for the date range. Press Sync Ads on the Campaigns page to pull the latest metrics."
+          />
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <GadsKpi label="GADS Clicks" value={fmtCount(summary.gads_clicks)} sub="from Google Ads" />
+              <GadsKpi
+                label="GADS CTR"
+                value={fmtPct(summary.gads_ctr)}
+                sub={`${fmtCount(summary.gads_impressions)} impressions`}
+              />
+              <GadsKpi
+                label="GADS Impressions"
+                value={fmtCount(summary.gads_impressions)}
+                sub="from Google Ads"
+              />
+              <GadsKpi
+                label="GADS CPC"
+                value={fmtInr(summary.gads_cpc)}
+                tooltip={fmtInrExact(summary.gads_cpc)}
+                sub={`spend ÷ GAds clicks`}
+              />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <GadsClicksImpressionsChart series={series} />
+              <GadsCtrCpcChart series={series} />
+            </div>
+          </>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+function GadsKpi({
+  label, value, sub, tooltip,
+}: { label: string; value: string; sub?: string; tooltip?: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/40 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
+      <div className="text-[10px] font-medium uppercase tracking-wide text-blue-700 dark:text-brand-300">
+        {label}
+      </div>
+      <div className="mt-1 text-xl font-semibold tabular-nums text-slate-900 dark:text-neutral-100" title={tooltip}>
+        {value}
+      </div>
+      {sub && <div className="mt-0.5 text-[11px] text-slate-500 dark:text-neutral-400">{sub}</div>}
+    </div>
+  );
+}
+
+function GadsClicksImpressionsChart({ series }: { series: CampaignDetailDailyPoint[] }) {
+  const { resolved } = useTheme();
+  const dark = resolved === 'dark';
+  const grid = dark ? '#262626' : '#e2e8f0';
+  const axis = dark ? '#a3a3a3' : '#64748b';
+  const clicksColor = dark ? '#60a5fa' : '#2563eb';
+  const imprColor = dark ? '#fbbf24' : '#d97706';
+
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium text-slate-700 dark:text-neutral-300">
+        Clicks vs impressions (GADS)
+      </div>
+      <div className="h-56 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+            <XAxis dataKey="date" tick={{ fill: axis, fontSize: 11 }} tickFormatter={fmtDateShort} stroke={grid} tickLine={false} />
+            <YAxis
+              yAxisId="clicks"
+              tick={{ fill: axis, fontSize: 11 }}
+              stroke={grid}
+              tickLine={false}
+              tickFormatter={(v) => new Intl.NumberFormat('en-IN', { notation: 'compact' }).format(Number(v))}
+              width={48}
+            />
+            <YAxis
+              yAxisId="impr"
+              orientation="right"
+              tick={{ fill: axis, fontSize: 11 }}
+              stroke={grid}
+              tickLine={false}
+              tickFormatter={(v) => new Intl.NumberFormat('en-IN', { notation: 'compact' }).format(Number(v))}
+              width={48}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: dark ? '#171717' : '#ffffff',
+                border: `1px solid ${dark ? '#404040' : '#e2e8f0'}`,
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              labelFormatter={(d) => new Date(String(d)).toDateString()}
+              formatter={(value, name) => [new Intl.NumberFormat('en-IN').format(Number(value)), String(name)]}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, color: axis }} iconType="circle" />
+            <Bar yAxisId="impr" dataKey="gads_impressions" name="Impressions" fill={imprColor} fillOpacity={0.4} />
+            <Line yAxisId="clicks" type="monotone" dataKey="gads_clicks" name="Clicks" stroke={clicksColor} strokeWidth={2} dot={{ r: 2 }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function GadsCtrCpcChart({ series }: { series: CampaignDetailDailyPoint[] }) {
+  const { resolved } = useTheme();
+  const dark = resolved === 'dark';
+  const grid = dark ? '#262626' : '#e2e8f0';
+  const axis = dark ? '#a3a3a3' : '#64748b';
+  const ctrColor = dark ? '#34d399' : '#059669';
+  const cpcColor = dark ? '#f472b6' : '#db2777';
+
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium text-slate-700 dark:text-neutral-300">
+        CTR vs CPC (GADS)
+      </div>
+      <div className="h-56 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={series} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={grid} vertical={false} />
+            <XAxis dataKey="date" tick={{ fill: axis, fontSize: 11 }} tickFormatter={fmtDateShort} stroke={grid} tickLine={false} />
+            <YAxis
+              yAxisId="ctr"
+              tick={{ fill: axis, fontSize: 11 }}
+              stroke={grid}
+              tickLine={false}
+              tickFormatter={(v) => `${(Number(v) * 100).toFixed(1)}%`}
+              width={48}
+            />
+            <YAxis
+              yAxisId="cpc"
+              orientation="right"
+              tick={{ fill: axis, fontSize: 11 }}
+              stroke={grid}
+              tickLine={false}
+              tickFormatter={(v) => fmtInrCompactAxis(Number(v))}
+              width={56}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: dark ? '#171717' : '#ffffff',
+                border: `1px solid ${dark ? '#404040' : '#e2e8f0'}`,
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              labelFormatter={(d) => new Date(String(d)).toDateString()}
+              formatter={(value, name) => {
+                if (name === 'CTR') return [`${(Number(value) * 100).toFixed(2)}%`, 'CTR'];
+                return [fmtInrExact(Number(value)), 'CPC'];
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, color: axis }} iconType="circle" />
+            <Line yAxisId="ctr" type="monotone" dataKey="gads_ctr" name="CTR" stroke={ctrColor} strokeWidth={2} dot={{ r: 2 }} />
+            <Line yAxisId="cpc" type="monotone" dataKey="gads_cpc" name="CPC" stroke={cpcColor} strokeWidth={2} dot={{ r: 2 }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

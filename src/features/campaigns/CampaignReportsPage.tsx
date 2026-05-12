@@ -11,12 +11,12 @@ import {
   Info,
   Inbox,
   Megaphone,
-  RefreshCw,
   TrendingDown,
   TrendingUp,
   CloudDownload,
   X,
 } from 'lucide-react';
+import { RefreshButton } from '@/features/reports/RefreshButton';
 import {
   Area,
   Bar,
@@ -40,7 +40,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { fmtMoney } from '@/lib/format';
+import { fmtInr, fmtInrExact } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { reportsApi } from '@/features/reports/api';
@@ -54,7 +54,19 @@ import type {
 } from '@/types';
 
 const fmtCount = (v: number) =>
-  new Intl.NumberFormat(undefined, { notation: v >= 10_000 ? 'compact' : 'standard' }).format(v);
+  new Intl.NumberFormat('en-IN', { notation: v >= 10_000 ? 'compact' : 'standard' }).format(v);
+
+// Tight INR formatter for chart axis labels — keeps tick labels under ~6
+// characters so the axis doesn't bloat when amounts run into crores.
+function fmtInrCompactAxis(v: number): string {
+  if (!Number.isFinite(v)) return '—';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1_00_00_000) return `${sign}₹${(abs / 1_00_00_000).toFixed(1)}Cr`;
+  if (abs >= 1_00_000) return `${sign}₹${(abs / 1_00_000).toFixed(1)}L`;
+  if (abs >= 1_000) return `${sign}₹${(abs / 1_000).toFixed(1)}k`;
+  return `${sign}₹${abs.toFixed(0)}`;
+}
 
 // All date keys in this codebase are YYYY-MM-DD (UTC). Keep the same
 // representation here so the From/To controls round-trip cleanly with the
@@ -99,7 +111,8 @@ function fmtDateShort(d: string): string {
 
 type SortKey =
   | 'revenue' | 'spend' | 'profit' | 'roas' | 'roi'
-  | 'clicks' | 'conversions' | 'cvr' | 'epc' | 'name';
+  | 'clicks' | 'conversions' | 'cvr' | 'epc' | 'name'
+  | 'gads_clicks' | 'gads_impressions' | 'gads_ctr' | 'gads_cpc';
 
 const SORT_LABEL: Record<SortKey, string> = {
   name: 'Campaign',
@@ -112,6 +125,10 @@ const SORT_LABEL: Record<SortKey, string> = {
   roi: 'ROI',
   cvr: 'CVR',
   epc: 'EPC',
+  gads_clicks: 'Clicks',
+  gads_impressions: 'Impressions',
+  gads_ctr: 'CTR',
+  gads_cpc: 'CPC',
 };
 
 export function CampaignReportsPage() {
@@ -135,7 +152,7 @@ export function CampaignReportsPage() {
       if (r.campaign_spends && r.campaign_spends.length > 0) {
         const namesAndSpends = r.campaign_spends
           .slice(0, 5)
-          .map((c) => `${c.campaign_name} (${fmtMoney(c.total_spend)} spend)`)
+          .map((c) => `${c.campaign_name} (${fmtInr(c.total_spend)} spend)`)
           .join(', ');
         const more = r.campaign_spends.length > 5 ? ` and ${r.campaign_spends.length - 5} more` : '';
         spendsText = ` Updated spends for: ${namesAndSpends}${more}.`;
@@ -208,7 +225,10 @@ export function CampaignReportsPage() {
     onSuccess: (r) => {
       setBackfillMsg({
         tone: 'success',
-        text: `Synced ${r.campaigns_updated.toLocaleString()} campaigns with ${fmtMoney(r.total_spend_micros / 1_000_000)} total ad spend from Google Ads in ${(r.duration_ms / 1000).toFixed(1)}s.`,
+        text:
+          `Synced ${r.campaigns_updated.toLocaleString()} campaigns with ${fmtInr(r.total_spend_inr)} total ad spend ` +
+          `(${(r.total_clicks ?? 0).toLocaleString()} clicks, ${(r.total_impressions ?? 0).toLocaleString()} impressions) ` +
+          `from Google Ads in ${(r.duration_ms / 1000).toFixed(1)}s.`,
       });
       qc.invalidateQueries({ queryKey: ['reports', 'campaigns'] });
       qc.invalidateQueries({ queryKey: ['report-campaign-detail'] });
@@ -232,23 +252,16 @@ export function CampaignReportsPage() {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => qc.invalidateQueries({ queryKey: ['reports'] })}
-              disabled={reportQuery.isFetching}
-              title="Refresh report data"
-            >
-              <RefreshCw className={cn('h-3.5 w-3.5', reportQuery.isFetching && 'animate-spin')} />
-              Refresh
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
               onClick={() => { setBackfillMsg(null); backfill.mutate(); }}
               disabled={backfill.isPending}
-              title="Rebuild the campaign rollup from your historical clicks + conversions. Idempotent. Operator-entered spend is preserved."
+              title="Rebuild only the campaign rollup from historical clicks + conversions. Idempotent. Operator-entered spend and GAds metrics are preserved."
             >
               {backfill.isPending ? <Spinner /> : <Database className="h-3.5 w-3.5" />}
               {backfill.isPending ? 'Rebuilding…' : 'Rebuild'}
             </Button>
+            <RefreshButton
+              invalidateOnSuccess={[['reports', 'campaigns']]}
+            />
           </div>
         }
       />
@@ -424,6 +437,10 @@ function Body({
         case 'roi': return dir * (a.roi - b.roi);
         case 'cvr': return dir * (a.cvr - b.cvr);
         case 'epc': return dir * (a.epc - b.epc);
+        case 'gads_clicks': return dir * ((a.gads_clicks ?? 0) - (b.gads_clicks ?? 0));
+        case 'gads_impressions': return dir * ((a.gads_impressions ?? 0) - (b.gads_impressions ?? 0));
+        case 'gads_ctr': return dir * ((a.gads_ctr ?? 0) - (b.gads_ctr ?? 0));
+        case 'gads_cpc': return dir * ((a.gads_cpc ?? 0) - (b.gads_cpc ?? 0));
         case 'revenue':
         default: return dir * (a.revenue - b.revenue);
       }
@@ -464,6 +481,7 @@ function buildDailyAggregate(campaigns: CampaignReportSummary[]): CampaignDailyP
   const dates = campaigns[0]!.series.map((p) => p.date);
   return dates.map((date, i) => {
     let clicks = 0, postbacks = 0, conversions = 0, revenue = 0, spend = 0;
+    let gadsClicks = 0, gadsImpressions = 0;
     for (const c of campaigns) {
       const p = c.series[i];
       if (!p) continue;
@@ -472,8 +490,22 @@ function buildDailyAggregate(campaigns: CampaignReportSummary[]): CampaignDailyP
       conversions += p.conversions;
       revenue += p.revenue;
       spend += p.spend;
+      gadsClicks += p.gads_clicks ?? 0;
+      gadsImpressions += p.gads_impressions ?? 0;
     }
-    return { date, clicks, postbacks, conversions, revenue, spend, profit: revenue - spend };
+    return {
+      date,
+      clicks,
+      postbacks,
+      conversions,
+      revenue,
+      spend,
+      profit: revenue - spend,
+      gads_clicks: gadsClicks,
+      gads_impressions: gadsImpressions,
+      gads_ctr: gadsImpressions > 0 ? gadsClicks / gadsImpressions : 0,
+      gads_cpc: gadsClicks > 0 ? spend / gadsClicks : 0,
+    };
   });
 }
 
@@ -515,59 +547,91 @@ function InsightBanner({ insight }: { insight: CampaignInsight }) {
 
 function KpiBand({ totals }: { totals: CampaignReportsResponse['totals'] }) {
   const profitTone = totals.profit > 0 ? 'positive' : totals.profit < 0 ? 'negative' : 'neutral';
+  const hasGads = totals.gads_impressions > 0 || totals.gads_clicks > 0;
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-      <Kpi
-        label="Revenue"
-        value={fmtMoney(totals.revenue)}
-        sub={`${fmtCount(totals.clicks)} clicks`}
-        highlight
-      />
-      <Kpi
-        label="Ad spend"
-        value={fmtMoney(totals.spend)}
-        sub={
-          totals.spend_coverage < 1
-            ? `${(totals.spend_coverage * 100).toFixed(0)}% coverage`
-            : 'all campaigns'
-        }
-      />
-      <Kpi
-        label="Profit"
-        value={fmtMoney(totals.profit)}
-        sub={
-          totals.spend > 0
-            ? `${totals.profitable_campaigns} winning · ${totals.unprofitable_campaigns} losing`
-            : 'spend not entered'
-        }
-        tone={profitTone}
-      />
-      <Kpi
-        label="ROAS"
-        value={fmtRoas(totals.roas)}
-        sub={
-          totals.roas >= 2 ? 'healthy'
-          : totals.roas >= 1 ? 'breakeven'
-          : totals.spend > 0 ? 'underwater' : 'no spend'
-        }
-        tone={totals.roas >= 1.5 ? 'positive' : totals.roas > 0 && totals.roas < 1 ? 'negative' : 'neutral'}
-      />
-      <Kpi label="ROI" value={fmtRoi(totals.roi)} sub={`avg across ${totals.campaigns} campaigns`} />
-      <Kpi
-        label="Conversions"
-        value={fmtCount(totals.conversions)}
-        sub={totals.clicks > 0 ? `${fmtPct(totals.cvr)} CVR · ${fmtMoney(totals.epc)} EPC` : '—'}
-      />
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <Kpi
+          label="Revenue"
+          value={fmtInr(totals.revenue)}
+          tooltip={fmtInrExact(totals.revenue)}
+          sub={`${fmtCount(totals.clicks)} clicks`}
+          highlight
+        />
+        <Kpi
+          label="Ad spend"
+          value={fmtInr(totals.spend)}
+          tooltip={fmtInrExact(totals.spend)}
+          sub={
+            totals.spend_coverage < 1
+              ? `${(totals.spend_coverage * 100).toFixed(0)}% coverage`
+              : 'all campaigns'
+          }
+        />
+        <Kpi
+          label="Profit"
+          value={fmtInr(totals.profit)}
+          tooltip={fmtInrExact(totals.profit)}
+          sub={
+            totals.spend > 0
+              ? `${totals.profitable_campaigns} winning · ${totals.unprofitable_campaigns} losing`
+              : 'spend not entered'
+          }
+          tone={profitTone}
+        />
+        <Kpi
+          label="ROAS"
+          value={fmtRoas(totals.roas)}
+          sub={
+            totals.roas >= 2 ? 'healthy'
+            : totals.roas >= 1 ? 'breakeven'
+            : totals.spend > 0 ? 'underwater' : 'no spend'
+          }
+          tone={totals.roas >= 1.5 ? 'positive' : totals.roas > 0 && totals.roas < 1 ? 'negative' : 'neutral'}
+        />
+        <Kpi label="ROI" value={fmtRoi(totals.roi)} sub={`avg across ${totals.campaigns} campaigns`} />
+        <Kpi
+          label="Conversions"
+          value={fmtCount(totals.conversions)}
+          sub={totals.clicks > 0 ? `${fmtPct(totals.cvr)} CVR · ${fmtInr(totals.epc)} EPC` : '—'}
+        />
+      </div>
+      {hasGads && (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Kpi
+            label="GADS Clicks"
+            value={fmtCount(totals.gads_clicks)}
+            sub="from Google Ads"
+          />
+          <Kpi
+            label="GADS CTR"
+            value={fmtPct(totals.gads_ctr)}
+            sub={`${fmtCount(totals.gads_impressions)} impressions`}
+          />
+          <Kpi
+            label="GADS Impressions"
+            value={fmtCount(totals.gads_impressions)}
+            sub="from Google Ads"
+          />
+          <Kpi
+            label="GADS CPC"
+            value={fmtInr(totals.gads_cpc)}
+            tooltip={fmtInrExact(totals.gads_cpc)}
+            sub={`weighted across ${totals.campaigns} campaigns`}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
 function Kpi({
-  label, value, sub, highlight, tone,
+  label, value, sub, tooltip, highlight, tone,
 }: {
   label: string;
   value: string;
   sub?: string;
+  tooltip?: string;
   highlight?: boolean;
   tone?: 'positive' | 'negative' | 'neutral';
 }) {
@@ -577,12 +641,15 @@ function Kpi({
         <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
           {label}
         </div>
-        <div className={cn(
-          'mt-1.5 text-2xl font-semibold tracking-tight tabular-nums',
-          tone === 'positive' && 'text-emerald-600 dark:text-emerald-400',
-          tone === 'negative' && 'text-red-600 dark:text-red-400',
-          !tone && (highlight ? 'text-brand-700 dark:text-brand-300' : 'text-slate-900 dark:text-neutral-100')
-        )}>
+        <div
+          className={cn(
+            'mt-1.5 text-2xl font-semibold tracking-tight tabular-nums',
+            tone === 'positive' && 'text-emerald-600 dark:text-emerald-400',
+            tone === 'negative' && 'text-red-600 dark:text-red-400',
+            !tone && (highlight ? 'text-brand-700 dark:text-brand-300' : 'text-slate-900 dark:text-neutral-100')
+          )}
+          title={tooltip}
+        >
           {value}
         </div>
         {sub && <div className="mt-0.5 text-xs text-slate-500 dark:text-neutral-400">{sub}</div>}
@@ -627,10 +694,8 @@ function RevenueVsSpendChart({ series }: { series: CampaignDailyPoint[] }) {
                 tick={{ fill: axis, fontSize: 11 }}
                 stroke={grid}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(Number(v))
-                }
-                width={56}
+                tickFormatter={(v) => fmtInrCompactAxis(Number(v))}
+                width={64}
               />
               <Tooltip
                 contentStyle={{
@@ -640,7 +705,7 @@ function RevenueVsSpendChart({ series }: { series: CampaignDailyPoint[] }) {
                   fontSize: 12,
                 }}
                 labelFormatter={(d) => new Date(String(d)).toDateString()}
-                formatter={(value, name) => [fmtMoney(Number(value)), String(name)]}
+                formatter={(value, name) => [fmtInrExact(Number(value)), String(name)]}
               />
               <Legend wrapperStyle={{ fontSize: 12, color: axis }} iconType="circle" />
               <Area type="monotone" dataKey="revenue" name="Revenue" stroke={revColor} fill="url(#rev-grad)" strokeWidth={2} />
@@ -677,10 +742,8 @@ function DailyProfitChart({ series }: { series: CampaignDailyPoint[] }) {
                 tick={{ fill: axis, fontSize: 11 }}
                 stroke={grid}
                 tickLine={false}
-                tickFormatter={(v) =>
-                  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', notation: 'compact' }).format(Number(v))
-                }
-                width={56}
+                tickFormatter={(v) => fmtInrCompactAxis(Number(v))}
+                width={64}
               />
               <Tooltip
                 contentStyle={{
@@ -690,7 +753,7 @@ function DailyProfitChart({ series }: { series: CampaignDailyPoint[] }) {
                   fontSize: 12,
                 }}
                 labelFormatter={(d) => new Date(String(d)).toDateString()}
-                formatter={(value) => [fmtMoney(Number(value)), 'Profit']}
+                formatter={(value) => [fmtInrExact(Number(value)), 'Profit']}
               />
               <Bar dataKey="profit" name="Profit" radius={[2, 2, 0, 0]}>
                 {series.map((p, i) => (
@@ -789,18 +852,59 @@ function CampaignsTable({
           <Table>
             <THead>
               <TR>
-                <SortHeader label={SORT_LABEL.name} active={sortKey==='name'} dir={sortDir} onClick={() => onSort('name')} />
-                <SortHeader label={SORT_LABEL.clicks} active={sortKey==='clicks'} dir={sortDir} onClick={() => onSort('clicks')} align="right" />
-                <SortHeader label={SORT_LABEL.conversions} active={sortKey==='conversions'} dir={sortDir} onClick={() => onSort('conversions')} align="right" />
-                <SortHeader label={SORT_LABEL.cvr} active={sortKey==='cvr'} dir={sortDir} onClick={() => onSort('cvr')} align="right" />
-                <SortHeader label={SORT_LABEL.epc} active={sortKey==='epc'} dir={sortDir} onClick={() => onSort('epc')} align="right" />
-                <SortHeader label={SORT_LABEL.revenue} active={sortKey==='revenue'} dir={sortDir} onClick={() => onSort('revenue')} align="right" />
-                <SortHeader label={SORT_LABEL.spend} active={sortKey==='spend'} dir={sortDir} onClick={() => onSort('spend')} align="right" />
-                <SortHeader label={SORT_LABEL.profit} active={sortKey==='profit'} dir={sortDir} onClick={() => onSort('profit')} align="right" />
-                <SortHeader label={SORT_LABEL.roas} active={sortKey==='roas'} dir={sortDir} onClick={() => onSort('roas')} align="right" />
-                <SortHeader label={SORT_LABEL.roi} active={sortKey==='roi'} dir={sortDir} onClick={() => onSort('roi')} align="right" />
-                <TH>Trend</TH>
-                <TH className="w-8" aria-label="Open detail" />
+                <TH rowSpan={2}>
+                  <SortLabel label={SORT_LABEL.name} active={sortKey==='name'} dir={sortDir} onClick={() => onSort('name')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.clicks} active={sortKey==='clicks'} dir={sortDir} onClick={() => onSort('clicks')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.conversions} active={sortKey==='conversions'} dir={sortDir} onClick={() => onSort('conversions')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.cvr} active={sortKey==='cvr'} dir={sortDir} onClick={() => onSort('cvr')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.epc} active={sortKey==='epc'} dir={sortDir} onClick={() => onSort('epc')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.revenue} active={sortKey==='revenue'} dir={sortDir} onClick={() => onSort('revenue')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.spend} active={sortKey==='spend'} dir={sortDir} onClick={() => onSort('spend')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.profit} active={sortKey==='profit'} dir={sortDir} onClick={() => onSort('profit')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.roas} active={sortKey==='roas'} dir={sortDir} onClick={() => onSort('roas')} />
+                </TH>
+                <TH rowSpan={2} className="text-right">
+                  <SortLabel label={SORT_LABEL.roi} active={sortKey==='roi'} dir={sortDir} onClick={() => onSort('roi')} />
+                </TH>
+                <TH
+                  colSpan={4}
+                  className="border-l border-slate-200 text-center text-[11px] uppercase tracking-wide text-blue-700 dark:border-neutral-800 dark:text-brand-300"
+                  title="Metrics pulled directly from Google Ads (per-campaign, per-day). Synced via the Sync Ads button or the orchestrated Refresh."
+                >
+                  GADS
+                </TH>
+                <TH rowSpan={2}>Trend</TH>
+                <TH rowSpan={2} className="w-8" aria-label="Open detail" />
+              </TR>
+              <TR>
+                <TH className="border-l border-slate-200 text-right dark:border-neutral-800">
+                  <SortLabel label="Clicks" active={sortKey==='gads_clicks'} dir={sortDir} onClick={() => onSort('gads_clicks')} />
+                </TH>
+                <TH className="text-right">
+                  <SortLabel label="CTR" active={sortKey==='gads_ctr'} dir={sortDir} onClick={() => onSort('gads_ctr')} />
+                </TH>
+                <TH className="text-right">
+                  <SortLabel label="Impressions" active={sortKey==='gads_impressions'} dir={sortDir} onClick={() => onSort('gads_impressions')} />
+                </TH>
+                <TH className="text-right">
+                  <SortLabel label="CPC" active={sortKey==='gads_cpc'} dir={sortDir} onClick={() => onSort('gads_cpc')} />
+                </TH>
               </TR>
             </THead>
             <TBody>
@@ -821,6 +925,7 @@ function CampaignRow({ row, onOpen }: { row: CampaignReportSummary; onOpen: () =
     : row.profit > 0 ? 'text-emerald-600 dark:text-emerald-400'
     : row.profit < 0 ? 'text-red-600 dark:text-red-400'
     : 'text-slate-500 dark:text-neutral-400';
+  const hasGads = (row.gads_impressions ?? 0) > 0 || (row.gads_clicks ?? 0) > 0;
   return (
     <TR
       className="cursor-pointer hover:bg-slate-50/60 dark:hover:bg-neutral-800/50"
@@ -851,13 +956,23 @@ function CampaignRow({ row, onOpen }: { row: CampaignReportSummary; onOpen: () =
         )}
       </TD>
       <TD className="text-right tabular-nums">{row.clicks > 0 ? fmtPct(row.cvr) : '—'}</TD>
-      <TD className="text-right tabular-nums">{row.clicks > 0 ? fmtMoney(row.epc) : '—'}</TD>
-      <TD className="text-right tabular-nums font-semibold text-slate-900 dark:text-neutral-100">{fmtMoney(row.revenue)}</TD>
-      <TD className="text-right tabular-nums">
-        {row.spend > 0 ? fmtMoney(row.spend) : <span className="text-amber-600 dark:text-amber-400 text-[11px]">not set</span>}
+      <TD className="text-right tabular-nums" title={row.clicks > 0 ? fmtInrExact(row.epc) : undefined}>
+        {row.clicks > 0 ? fmtInr(row.epc) : '—'}
       </TD>
-      <TD className={cn('text-right tabular-nums font-semibold', profitTone)}>
-        {row.spend > 0 ? fmtMoney(row.profit) : '—'}
+      <TD
+        className="text-right tabular-nums font-semibold text-slate-900 dark:text-neutral-100"
+        title={fmtInrExact(row.revenue)}
+      >
+        {fmtInr(row.revenue)}
+      </TD>
+      <TD className="text-right tabular-nums" title={row.spend > 0 ? fmtInrExact(row.spend) : undefined}>
+        {row.spend > 0 ? fmtInr(row.spend) : <span className="text-amber-600 dark:text-amber-400 text-[11px]">not set</span>}
+      </TD>
+      <TD
+        className={cn('text-right tabular-nums font-semibold', profitTone)}
+        title={row.spend > 0 ? fmtInrExact(row.profit) : undefined}
+      >
+        {row.spend > 0 ? fmtInr(row.profit) : '—'}
       </TD>
       <TD className="text-right tabular-nums">
         <span className={cn(
@@ -872,6 +987,22 @@ function CampaignRow({ row, onOpen }: { row: CampaignReportSummary; onOpen: () =
         </span>
       </TD>
       <TD className="text-right tabular-nums">{row.spend > 0 ? fmtRoi(row.roi) : '—'}</TD>
+      {/* GADS column group */}
+      <TD className="border-l border-slate-200 text-right tabular-nums dark:border-neutral-800">
+        {hasGads ? fmtCount(row.gads_clicks ?? 0) : <span className="text-[11px] text-slate-400 dark:text-neutral-600">—</span>}
+      </TD>
+      <TD className="text-right tabular-nums">
+        {hasGads ? fmtPct(row.gads_ctr ?? 0) : <span className="text-[11px] text-slate-400 dark:text-neutral-600">—</span>}
+      </TD>
+      <TD className="text-right tabular-nums">
+        {hasGads ? fmtCount(row.gads_impressions ?? 0) : <span className="text-[11px] text-slate-400 dark:text-neutral-600">—</span>}
+      </TD>
+      <TD
+        className="text-right tabular-nums"
+        title={hasGads ? fmtInrExact(row.gads_cpc ?? 0) : undefined}
+      >
+        {hasGads && (row.gads_cpc ?? 0) > 0 ? fmtInr(row.gads_cpc ?? 0) : <span className="text-[11px] text-slate-400 dark:text-neutral-600">—</span>}
+      </TD>
       <TD>
         <ProfitSparkline series={row.series} />
       </TD>
@@ -882,23 +1013,21 @@ function CampaignRow({ row, onOpen }: { row: CampaignReportSummary; onOpen: () =
   );
 }
 
-function SortHeader({
-  label, active, dir, onClick, align = 'left',
-}: { label: string; active: boolean; dir: 'asc' | 'desc'; onClick: () => void; align?: 'left' | 'right' }) {
+function SortLabel({
+  label, active, dir, onClick,
+}: { label: string; active: boolean; dir: 'asc' | 'desc'; onClick: () => void }) {
   return (
-    <TH className={align === 'right' ? 'text-right' : ''}>
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          'inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-neutral-200',
-          active && 'text-slate-900 dark:text-neutral-100'
-        )}
-      >
-        {label}
-        {active && <span className="text-[10px]">{dir === 'desc' ? '▼' : '▲'}</span>}
-      </button>
-    </TH>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-neutral-200',
+        active && 'text-slate-900 dark:text-neutral-100'
+      )}
+    >
+      {label}
+      {active && <span className="text-[10px]">{dir === 'desc' ? '▼' : '▲'}</span>}
+    </button>
   );
 }
 

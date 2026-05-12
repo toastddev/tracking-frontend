@@ -524,6 +524,10 @@ export interface CampaignDailyPoint {
   revenue: number;
   spend: number;
   profit: number;
+  gads_clicks: number;
+  gads_impressions: number;
+  gads_ctr: number;
+  gads_cpc: number;
 }
 
 export interface CampaignReportSummary {
@@ -549,6 +553,10 @@ export interface CampaignReportSummary {
   approval_rate: number;
   spend_coverage: number;
   offers: string[];
+  gads_clicks: number;
+  gads_impressions: number;
+  gads_ctr: number;
+  gads_cpc: number;
   series: CampaignDailyPoint[];
 }
 
@@ -579,6 +587,10 @@ export interface CampaignReportsResponse {
     profitable_campaigns: number;
     unprofitable_campaigns: number;
     spend_coverage: number;
+    gads_clicks: number;
+    gads_impressions: number;
+    gads_ctr: number;
+    gads_cpc: number;
   };
   insights: CampaignInsight[];
 }
@@ -597,6 +609,10 @@ export interface CampaignDetailDailyPoint {
   spend: number;
   profit: number;
   roas: number;
+  gads_clicks: number;
+  gads_impressions: number;
+  gads_ctr: number;
+  gads_cpc: number;
 }
 
 export interface CampaignDetailSummary {
@@ -617,6 +633,10 @@ export interface CampaignDetailSummary {
   roas: number;
   roi: number;
   approval_rate: number;
+  gads_clicks: number;
+  gads_impressions: number;
+  gads_ctr: number;
+  gads_cpc: number;
 }
 
 export interface CampaignDetailDeltas {
@@ -774,6 +794,93 @@ export interface AffiliateApi {
   max_records_per_run?: number;
   created_at?: string;
   updated_at?: string;
+}
+
+// ── Refresh (orchestrated) ───────────────────────────────────────────
+export type RefreshRunStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type RefreshPhase =
+  | 'init'
+  | 'apis'
+  | 'backfill_offers'
+  | 'backfill_campaigns'
+  | 'finalising'
+  | 'done';
+
+export type RefreshStep =
+  | { kind: 'init'; label: string }
+  | {
+      kind: 'api';
+      api_id: string;
+      name: string;
+      ok: boolean;
+      run_id?: string;
+      reason?: string;
+      duration_ms: number;
+    }
+  | {
+      kind: 'backfill_offers';
+      ok: boolean;
+      conversions_scanned?: number;
+      buckets_written?: number;
+      duration_ms?: number;
+      error?: string;
+      truncated?: boolean;
+      truncated_reason?: string;
+    }
+  | {
+      kind: 'backfill_campaigns';
+      ok: boolean;
+      conversions_scanned?: number;
+      buckets_written?: number;
+      duration_ms?: number;
+      error?: string;
+      truncated?: boolean;
+      truncated_reason?: string;
+      campaign_spends_updated?: number;
+    };
+
+export interface RefreshError {
+  phase: RefreshPhase;
+  message: string;
+  at: string;
+}
+
+export interface RefreshRun {
+  run_id: string;
+  holder: string;
+  status: RefreshRunStatus;
+  phase: RefreshPhase;
+  current_step: string;
+  apis_total: number;
+  apis_done: number;
+  apis_succeeded: number;
+  apis_failed: number;
+  apis_skipped: number;
+  steps: RefreshStep[];
+  errors: RefreshError[];
+  backfill_from: string | null;
+  backfill_to: string | null;
+  previous_refresh_at: string | null;
+  started_at: string;
+  finished_at: string | null;
+  duration_ms: number | null;
+}
+
+export interface RefreshStartResponse {
+  ok: true;
+  run_id: string;
+  run: RefreshRun | null;
+}
+
+export interface RefreshConflictResponse {
+  error: 'already_running' | string;
+  active_run_id?: string;
+  active_started_at?: string;
+}
+
+export interface RefreshStatus {
+  last_refresh_at: string | null;
+  active_run_id: string | null;
 }
 
 export interface AffiliateApiRunRecord {

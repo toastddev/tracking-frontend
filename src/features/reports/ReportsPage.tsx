@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { CenteredSpinner, Spinner } from '@/components/ui/Spinner';
 import { reportsApi } from './api';
+import { RefreshButton } from './RefreshButton';
 import { useDateRange } from '@/lib/dateRange';
 import { ActivityChart, RevenueChart } from './ReportChart';
 import { ClicksReportTab } from './ClicksReportTab';
@@ -48,9 +49,14 @@ export function ReportsPage() {
         title="Reports"
         description="Clicks, postbacks, conversions, and revenue — across every offer and network."
         actions={
-          overviewQuery.isFetching && (
-            <Spinner className="text-slate-400 dark:text-neutral-500" />
-          )
+          <div className="flex items-center gap-3">
+            {overviewQuery.isFetching && (
+              <Spinner className="text-slate-400 dark:text-neutral-500" />
+            )}
+            <RefreshButton
+              invalidateOnSuccess={[['reports']]}
+            />
+          </div>
         }
       />
 

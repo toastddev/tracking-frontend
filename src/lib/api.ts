@@ -5,10 +5,15 @@ const BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(status: number, message: string, code?: string) {
+  // Original JSON body of the failing response, when the server returned
+  // structured details (e.g. a 409 carrying `active_run_id`). Always check
+  // `instanceof ApiError` before accessing.
+  body?: unknown;
+  constructor(status: number, message: string, code?: string, body?: unknown) {
     super(message);
     this.status = status;
     this.code = code;
+    this.body = body;
   }
 }
 
@@ -55,7 +60,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 
   if (!res.ok) {
     const code = (data && typeof data === 'object' && 'error' in data) ? String((data as { error: unknown }).error) : 'request_failed';
-    throw new ApiError(res.status, code, code);
+    throw new ApiError(res.status, code, code, data);
   }
 
   return data as T;

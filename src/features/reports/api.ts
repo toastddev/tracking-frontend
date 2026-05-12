@@ -9,6 +9,9 @@ import type {
   Page,
   PostbackDetailResponse,
   PostbackReportsResponse,
+  RefreshRun,
+  RefreshStartResponse,
+  RefreshStatus,
   ReportSummary,
   TimeseriesPoint,
 } from '@/types';
@@ -201,7 +204,10 @@ export const reportsApi = {
       from: string;
       to: string;
       campaigns_updated: number;
+      total_spend_inr: number;
       total_spend_micros: number;
+      total_clicks: number;
+      total_impressions: number;
       duration_ms: number;
     }>('/api/reports/campaigns/google-ads-sync', {
       method: 'POST',
@@ -216,6 +222,21 @@ export const reportsApi = {
       method: 'PUT',
       body: prefs,
     });
+  },
+  // Orchestrated refresh: runs every affiliate API and then backfills offer
+  // + campaign reports from the last successful refresh. Long-running — the
+  // HTTP request blocks until completion, but the client should also poll
+  // refreshRun() in parallel to surface live progress. Returns 409 (via an
+  // ApiError) when another Cloud Run instance already holds the lock; the
+  // error body's `active_run_id` lets the UI attach to the in-flight run.
+  refreshAll() {
+    return api<RefreshStartResponse>('/api/refresh', { method: 'POST' });
+  },
+  refreshStatus() {
+    return api<RefreshStatus>('/api/refresh/status');
+  },
+  refreshRun(run_id: string) {
+    return api<RefreshRun>(`/api/refresh/runs/${encodeURIComponent(run_id)}`);
   },
 };
 
