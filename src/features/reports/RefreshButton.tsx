@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Loader2,
   RefreshCw,
+  Unlock,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -146,6 +147,20 @@ export function RefreshButton({
     },
   });
 
+  // Force-clear a stuck refresh lock. Used when the holder instance died
+  // mid-run (e.g. local dev server killed) and the operator doesn't want to
+  // wait for the 30-min lease to expire.
+  const unlock = useMutation({
+    mutationFn: () => reportsApi.refreshUnlock(),
+    onSuccess: () => {
+      setActiveRunId(null);
+      setFinalRun(null);
+      setDismissed(true);
+      qc.invalidateQueries({ queryKey: ['refresh-status'] });
+      lastTerminalRunIdRef.current = null;
+    },
+  });
+
   const running = !!activeRunId && (
     !runQuery.data ||
     runQuery.data.status === 'pending' ||
@@ -186,6 +201,8 @@ export function RefreshButton({
             setDismissed(true);
             setFinalRun(null);
           }}
+          onForceUnlock={() => unlock.mutate()}
+          unlockPending={unlock.isPending}
         />
       )}
     </div>
@@ -203,6 +220,8 @@ function ProgressBanner({
   expanded,
   onToggle,
   onDismiss,
+  onForceUnlock,
+  unlockPending,
 }: {
   run: RefreshRun | null | undefined;
   starting: boolean;
@@ -211,6 +230,8 @@ function ProgressBanner({
   expanded: boolean;
   onToggle: () => void;
   onDismiss: () => void;
+  onForceUnlock: () => void;
+  unlockPending: boolean;
 }) {
   // Start-time error (network / 5xx, not 409).
   if (startError && !running && !run) {
@@ -294,6 +315,23 @@ function ProgressBanner({
             )}
             {run.steps.length > 0 && (
               <StepList steps={run.steps} />
+            )}
+
+            {running && (
+              <div className="flex items-center justify-between gap-2 border-t border-current/10 pt-2 text-[11px]">
+                <span className="opacity-70">
+                  Holder dead? Force-clear the lock to start a fresh refresh.
+                </span>
+                <button
+                  type="button"
+                  onClick={onForceUnlock}
+                  disabled={unlockPending}
+                  className="inline-flex items-center gap-1 rounded-md border border-current/20 px-2 py-1 font-medium opacity-90 hover:opacity-100 disabled:opacity-50"
+                >
+                  <Unlock className="h-3 w-3" />
+                  {unlockPending ? 'Unlocking…' : 'Force unlock'}
+                </button>
+              </div>
             )}
           </div>
         )}

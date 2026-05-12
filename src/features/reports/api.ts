@@ -238,6 +238,11 @@ export const reportsApi = {
   refreshRun(run_id: string) {
     return api<RefreshRun>(`/api/refresh/runs/${encodeURIComponent(run_id)}`);
   },
+  // Force-clear a stuck refresh lock. Use when a holder instance died mid-run
+  // and the operator doesn't want to wait out the 30-min lease.
+  refreshUnlock() {
+    return api<{ ok: true; cleared_run_id: string | null }>('/api/refresh/unlock', { method: 'POST' });
+  },
 };
 
 export interface GoogleAdsSyncState {
