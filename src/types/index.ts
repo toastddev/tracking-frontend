@@ -567,6 +567,17 @@ export interface CampaignInsight {
   campaign_id?: string;
 }
 
+// Per-day total revenue across ALL conversions (offer_reports), regardless of
+// campaign attribution — converted to INR via the backend's toInr helper.
+// Drives the dashed "total revenue" overlay on RevenueVsSpendChart so the
+// operator can see the gap between campaign-attributed revenue (which excludes
+// untagged traffic) and the true daily total. `null` means the day had FX
+// failures and nothing converted — the chart leaves a gap rather than drawing 0.
+export interface CampaignDailyTotal {
+  date: string;
+  total_revenue_inr: number | null;
+}
+
 export interface CampaignReportsResponse {
   from: string;
   to: string;
@@ -591,7 +602,9 @@ export interface CampaignReportsResponse {
     gads_impressions: number;
     gads_ctr: number;
     gads_cpc: number;
+    total_revenue_inr: number;
   };
+  daily_totals: CampaignDailyTotal[];
   insights: CampaignInsight[];
 }
 

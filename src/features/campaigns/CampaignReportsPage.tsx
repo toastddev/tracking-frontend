@@ -50,10 +50,29 @@ import { type ReportRange } from '@/features/reports/ReportFilters';
 import { useDateRange } from '@/lib/dateRange';
 import type {
   CampaignDailyPoint,
+  CampaignDailyTotal,
   CampaignInsight,
   CampaignReportSummary,
   CampaignReportsResponse,
 } from '@/types';
+
+// Daily aggregate point used by the campaigns-page chart. Extends the
+// per-campaign series with `total_revenue_inr` (sum across ALL conversions,
+// from offer_reports, FX-converted to INR). `null` is preserved as `undefined`
+// for the chart so Recharts draws a gap instead of a 0.
+//
+// Also carries Google-Ads-only sub-totals (campaigns whose source ==
+// 'gad_campaignid', i.e. real GAds tags + the synthetic gads_untagged
+// fallback) so the tooltip can show the true GAds revenue / click share.
+interface CampaignDailyAggregatePoint extends CampaignDailyPoint {
+  total_revenue_inr?: number;
+  // GAds-only sub-totals (excludes utm_campaign-only sources). Drives the
+  // "X% of total revenue from GAds" tooltip the operator asked for.
+  gads_only_revenue: number;
+  gads_only_clicks: number;
+  gads_revenue_share?: number;
+  gads_click_share?: number;
+}
 
 const fmtCount = (v: number) =>
   new Intl.NumberFormat('en-IN', { notation: v >= 10_000 ? 'compact' : 'standard' }).format(v);
@@ -465,7 +484,10 @@ function Body({
     );
   }, [sorted, search]);
 
-  const dailyAggregate = useMemo(() => buildDailyAggregate(data.campaigns), [data.campaigns]);
+  const dailyAggregate = useMemo(
+    () => buildDailyAggregate(data.campaigns, data.daily_totals),
+    [data.campaigns, data.daily_totals],
+  );
 
   void range;
 
@@ -504,12 +526,25 @@ function Body({
   );
 }
 
-function buildDailyAggregate(campaigns: CampaignReportSummary[]): CampaignDailyPoint[] {
+function buildDailyAggregate(
+  campaigns: CampaignReportSummary[],
+  dailyTotals: CampaignDailyTotal[] | undefined,
+): CampaignDailyAggregatePoint[] {
   if (campaigns.length === 0) return [];
   const dates = campaigns[0]!.series.map((p) => p.date);
+  // Index daily totals by date so the merge survives date-mismatches between
+  // the campaign series and the offer_reports totals (e.g. partial-day data).
+  const totalsByDate = new Map<string, number | null>();
+  for (const t of dailyTotals ?? []) totalsByDate.set(t.date, t.total_revenue_inr);
+
   return dates.map((date, i) => {
     let clicks = 0, postbacks = 0, conversions = 0, revenue = 0, spend = 0;
     let gadsClicks = 0, gadsImpressions = 0;
+    // Sub-totals over only-GAds-sourced campaigns (source === 'gad_campaignid'
+    // includes the synthetic gads_untagged fallback). Used for the share %
+    // shown in the tooltip — the user explicitly asked for the *GAds* share,
+    // not the broader campaign-attributed share that also includes utm_*.
+    let gadsOnlyRevenue = 0, gadsOnlyClicks = 0;
     for (const c of campaigns) {
       const p = c.series[i];
       if (!p) continue;
@@ -520,7 +555,18 @@ function buildDailyAggregate(campaigns: CampaignReportSummary[]): CampaignDailyP
       spend += p.spend;
       gadsClicks += p.gads_clicks ?? 0;
       gadsImpressions += p.gads_impressions ?? 0;
+      if (c.source === 'gad_campaignid') {
+        gadsOnlyRevenue += p.revenue;
+        gadsOnlyClicks += p.clicks;
+      }
     }
+    const total = totalsByDate.has(date) ? totalsByDate.get(date) : 0;
+    const gadsRevenueShare = total != null && total > 0 ? gadsOnlyRevenue / total : undefined;
+    // For clicks we use campaign_reports total clicks as the denominator —
+    // offer_reports has a separate clicks counter, but it's redundant for this
+    // chart's question ("how much of attributed click volume is GAds"). When
+    // clicks is 0 we suppress the share.
+    const gadsClickShare = clicks > 0 ? gadsOnlyClicks / clicks : undefined;
     return {
       date,
       clicks,
@@ -533,6 +579,11 @@ function buildDailyAggregate(campaigns: CampaignReportSummary[]): CampaignDailyP
       gads_impressions: gadsImpressions,
       gads_ctr: gadsImpressions > 0 ? gadsClicks / gadsImpressions : 0,
       gads_cpc: gadsClicks > 0 ? spend / gadsClicks : 0,
+      total_revenue_inr: total ?? undefined,
+      gads_only_revenue: gadsOnlyRevenue,
+      gads_only_clicks: gadsOnlyClicks,
+      gads_revenue_share: gadsRevenueShare,
+      gads_click_share: gadsClickShare,
     };
   });
 }
@@ -731,19 +782,31 @@ function Kpi({
 
 // ── Charts ───────────────────────────────────────────────────────────
 
-function RevenueVsSpendChart({ series }: { series: CampaignDailyPoint[] }) {
+function RevenueVsSpendChart({ series }: { series: CampaignDailyAggregatePoint[] }) {
   const { resolved } = useTheme();
   const dark = resolved === 'dark';
   const grid = dark ? '#262626' : '#e2e8f0';
   const axis = dark ? '#a3a3a3' : '#64748b';
   const revColor = dark ? '#34d399' : '#059669';
   const spendColor = dark ? '#f87171' : '#dc2626';
+  // Dashed total-revenue line: muted so it sits "behind" the attributed
+  // revenue area while still readable. Slate/indigo because emerald already
+  // belongs to attributed revenue.
+  const totalColor = dark ? '#94a3b8' : '#475569';
+
+  // Has any day reported a non-null offer_reports total? If not, hide the
+  // overlay entirely to avoid drawing a flat line that confuses the operator.
+  const hasTotal = series.some((p) => typeof p.total_revenue_inr === 'number' && p.total_revenue_inr > 0);
 
   return (
     <Card>
       <CardHeader
         title="Revenue vs ad spend"
-        subtitle="Daily totals across all campaigns. Green above red means profitable; red above green means burning money."
+        subtitle={
+          hasTotal
+            ? 'Daily totals across all campaigns. The dashed line is the true daily revenue across ALL conversions (offer_reports, INR); the gap below it is revenue that never made it into a campaign rollup.'
+            : 'Daily totals across all campaigns. Green above red means profitable; red above green means burning money.'
+        }
       />
       <CardBody className="p-0">
         <div className="h-72 w-full px-2 pb-2 pt-3 sm:px-4">
@@ -776,11 +839,41 @@ function RevenueVsSpendChart({ series }: { series: CampaignDailyPoint[] }) {
                   fontSize: 12,
                 }}
                 labelFormatter={(d) => new Date(String(d)).toDateString()}
-                formatter={(value, name) => [fmtInrExact(Number(value)), String(name)]}
+                formatter={(value, name, item) => {
+                  // Annotate the campaign-attributed revenue line with the
+                  // GAds-only share (revenue from source='gad_campaignid'
+                  // campaigns, including the synthetic gads_untagged fallback)
+                  // and the GAds click share, so the operator can see at a
+                  // glance how much of the day's revenue came from GAds.
+                  if (name === 'Revenue (campaigns)') {
+                    const point = item.payload as CampaignDailyAggregatePoint | undefined;
+                    const revShare = point?.gads_revenue_share;
+                    const clickShare = point?.gads_click_share;
+                    const parts: string[] = [fmtInrExact(Number(value))];
+                    if (revShare != null) parts.push(`GAds rev ${(revShare * 100).toFixed(1)}%`);
+                    if (clickShare != null) parts.push(`GAds clicks ${(clickShare * 100).toFixed(1)}%`);
+                    return [parts.join(' · '), String(name)];
+                  }
+                  if (value == null) return ['—', String(name)];
+                  return [fmtInrExact(Number(value)), String(name)];
+                }}
               />
               <Legend wrapperStyle={{ fontSize: 12, color: axis }} iconType="circle" />
-              <Area type="monotone" dataKey="revenue" name="Revenue" stroke={revColor} fill="url(#rev-grad)" strokeWidth={2} />
+              <Area type="monotone" dataKey="revenue" name="Revenue (campaigns)" stroke={revColor} fill="url(#rev-grad)" strokeWidth={2} />
               <Area type="monotone" dataKey="spend" name="Ad spend" stroke={spendColor} fill="url(#spend-grad)" strokeWidth={2} />
+              {hasTotal && (
+                <Line
+                  type="monotone"
+                  dataKey="total_revenue_inr"
+                  name="Revenue (all conversions)"
+                  stroke={totalColor}
+                  strokeWidth={1.75}
+                  strokeDasharray="5 4"
+                  dot={false}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                />
+              )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
