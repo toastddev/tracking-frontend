@@ -13,7 +13,7 @@ import { ApiError } from '@/lib/api';
 import { fmtDateTime, fmtRelative } from '@/lib/format';
 import { affiliateApisApi } from './api';
 import { AffApiFormModal } from './AffApiFormModal';
-import type { AffiliateApiRunRecord } from '@/types';
+import type { AffiliateApiHttpDebug, AffiliateApiRunRecord } from '@/types';
 
 export function AffApiDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -212,6 +212,9 @@ export function AffApiDetailPage() {
                 {testResult.error}
               </div>
             )}
+            {testResult.debug && testResult.debug.length > 0 && (
+              <DebugView entries={testResult.debug} />
+            )}
           </CardBody>
         </Card>
       )}
@@ -332,5 +335,66 @@ function RunStatsRow({ run }: { run: AffiliateApiRunRecord }) {
         </div>
       )}
     </>
+  );
+}
+
+// Pretty-prints the body when it's JSON; otherwise shows it raw (errors,
+// HTML 500 pages, XML — all stay readable).
+function prettyBody(d: AffiliateApiHttpDebug): string {
+  const trimmed = d.body_snippet.trimStart();
+  if (d.content_type.toLowerCase().includes('json') || trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      return JSON.stringify(JSON.parse(d.body_snippet), null, 2);
+    } catch {
+      // not valid JSON, or truncated mid-document — fall through to raw text
+    }
+  }
+  return d.body_snippet;
+}
+
+function DebugEntry({ d }: { d: AffiliateApiHttpDebug }) {
+  return (
+    <div className="rounded-md ring-1 ring-slate-200 dark:ring-neutral-800">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-neutral-800">
+        <Badge tone="gray">Page {d.page}</Badge>
+        <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">{d.http_method}</span>
+        <Badge tone={d.ok ? 'green' : 'red'}>HTTP {d.http_status}</Badge>
+        <span className="text-xs text-slate-400 dark:text-neutral-500">{d.content_type || 'no content-type'}</span>
+        <span className="text-xs text-slate-400 dark:text-neutral-500">{d.duration_ms}ms</span>
+        {d.items_found != null && (
+          <Badge tone={d.items_found > 0 ? 'blue' : 'amber'}>
+            {d.items_found} item{d.items_found === 1 ? '' : 's'} at items_path
+          </Badge>
+        )}
+      </div>
+      <div className="space-y-2 px-3 py-2">
+        <div className="text-xs">
+          <span className="text-slate-400 dark:text-neutral-500">URL </span>
+          <code className="break-all font-mono text-slate-600 dark:text-neutral-300">{d.request_url}</code>
+        </div>
+        {d.parse_error && (
+          <div className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 ring-1 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/30">
+            Parse error: {d.parse_error}
+          </div>
+        )}
+        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-md bg-slate-900 px-3 py-2 font-mono text-xs leading-relaxed text-slate-100 dark:bg-neutral-950">
+          {prettyBody(d) || '(empty body)'}
+          {d.body_truncated ? '\n… (truncated)' : ''}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+function DebugView({ entries }: { entries: AffiliateApiHttpDebug[] }) {
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-neutral-500">
+        Raw HTTP response{entries.length > 1 ? `s · ${entries.length} pages` : ''}
+      </div>
+      {entries.map((d) => (
+        <DebugEntry key={d.page} d={d} />
+      ))}
+    </div>
   );
 }

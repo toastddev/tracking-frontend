@@ -897,6 +897,21 @@ export interface RefreshStatus {
   active_run_id: string | null;
 }
 
+// Per-page raw HTTP capture — populated only on dry runs for debugging.
+export interface AffiliateApiHttpDebug {
+  page: number;
+  request_url: string;
+  http_method: string;
+  http_status: number;
+  ok: boolean;
+  content_type: string;
+  duration_ms: number;
+  body_snippet: string;
+  body_truncated: boolean;
+  parse_error?: string;
+  items_found?: number;
+}
+
 export interface AffiliateApiRunRecord {
   run_id: string;
   api_id: string;
@@ -919,4 +934,5 @@ export interface AffiliateApiRunRecord {
   gads_skipped?: number;
   gads_failed?: number;
   gads_errors?: string[];
+  debug?: AffiliateApiHttpDebug[];
 }
