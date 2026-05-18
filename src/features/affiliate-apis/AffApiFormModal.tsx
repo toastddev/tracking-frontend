@@ -115,6 +115,33 @@ function mapFromRows(rows: KvRow[]): Record<string, string> {
   return out;
 }
 
+// Query params allow repeated keys (e.g. HasOffers `fields[]`). Duplicate keys
+// collapse into a string[] instead of overwriting; single keys stay strings.
+function rowsFromQueryParams(m?: Record<string, string | string[]>): KvRow[] {
+  if (!m) return [];
+  const rows: KvRow[] = [];
+  let i = 0;
+  for (const [k, v] of Object.entries(m)) {
+    for (const val of Array.isArray(v) ? v : [v]) {
+      rows.push({ id: `init-${i++}`, k, v: val });
+    }
+  }
+  return rows;
+}
+
+function queryParamsFromRows(rows: KvRow[]): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const r of rows) {
+    const k = r.k.trim();
+    if (!k) continue;
+    const existing = out[k];
+    if (existing === undefined) out[k] = r.v;
+    else if (Array.isArray(existing)) existing.push(r.v);
+    else out[k] = [existing, r.v];
+  }
+  return out;
+}
+
 function genRowId(): string {
   return `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -138,7 +165,7 @@ function fromInitial(api: AffiliateApi): FormState {
     http_method: api.request.http_method ?? 'GET',
     body_template: api.request.body_template ?? '',
     graphql_query: api.request.graphql_query ?? '',
-    query_params: rowsFromMap(api.request.query_params),
+    query_params: rowsFromQueryParams(api.request.query_params),
     headers: rowsFromMap(api.request.headers),
     pg_type: api.pagination.type,
     pg_page_param: api.pagination.page_param ?? 'page',
@@ -214,7 +241,7 @@ export function AffApiFormModal({ open, onClose, initial }: Props) {
           }
         : {
             http_method: form.http_method,
-            query_params: mapFromRows(form.query_params),
+            query_params: queryParamsFromRows(form.query_params),
             body_template: form.body_template.trim() || undefined,
             headers: mapFromRows(form.headers),
           },

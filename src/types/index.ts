@@ -782,7 +782,8 @@ export interface AffiliateApiSchedule {
 
 export interface AffiliateApiRequestConfig {
   http_method?: 'GET' | 'POST';
-  query_params?: Record<string, string>;
+  // A value may be an array to emit a repeated query key (e.g. `fields[]`).
+  query_params?: Record<string, string | string[]>;
   body_template?: string | null;
   headers?: Record<string, string>;
   graphql_query?: string;
