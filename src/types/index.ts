@@ -52,6 +52,9 @@ export interface ClickRecord {
   referrer?: string;
   country?: string;
   redirect_url: string;
+  // True when the click was rejected by the referer blocklist — the user was
+  // shown an error page instead of being redirected to the offer.
+  blocked?: boolean;
   created_at: string;
 }
 

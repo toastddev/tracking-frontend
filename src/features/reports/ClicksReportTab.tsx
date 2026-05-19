@@ -274,7 +274,14 @@ export function ClicksReportTab({ range }: Props) {
                   const subCount = Object.keys(c.sub_params ?? {}).length;
                   const extraCount = Object.keys(c.extra_params ?? {}).length;
                   return (
-                    <TR key={c.click_id} className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50">
+                    <TR
+                      key={c.click_id}
+                      className={
+                        c.blocked
+                          ? 'bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20'
+                          : 'hover:bg-slate-50/60 dark:hover:bg-neutral-800/50'
+                      }
+                    >
                       <TD className="whitespace-nowrap text-xs text-slate-600 dark:text-neutral-400">
                         {fmtDateTime(c.created_at)}
                       </TD>
@@ -286,7 +293,14 @@ export function ClicksReportTab({ range }: Props) {
                           {shortId(c.click_id, 12)}
                         </Link>
                       </TD>
-                      <TD className="text-sm">{c.offer_id}</TD>
+                      <TD className="text-sm">
+                        <div className="flex items-center gap-1.5">
+                          {c.offer_id}
+                          {c.blocked && (
+                            <Badge tone="red" className="text-[10px]">Blocked</Badge>
+                          )}
+                        </div>
+                      </TD>
                       <TD className="text-sm">{c.aff_id}</TD>
                       <TD>
                         <div className="flex flex-wrap gap-1">
@@ -312,7 +326,10 @@ export function ClicksReportTab({ range }: Props) {
           </div>
           <ul className="divide-y divide-slate-100 sm:hidden dark:divide-neutral-800">
             {query.data?.items.map((c) => (
-              <li key={c.click_id} className="px-4 py-3">
+              <li
+                key={c.click_id}
+                className={`px-4 py-3 ${c.blocked ? 'bg-red-50 dark:bg-red-500/10' : ''}`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <Link
                     to={`/clicks/${encodeURIComponent(c.click_id)}`}
@@ -322,8 +339,9 @@ export function ClicksReportTab({ range }: Props) {
                   </Link>
                   <span className="text-xs text-slate-500 dark:text-neutral-400">{fmtDateTime(c.created_at)}</span>
                 </div>
-                <div className="mt-1 text-sm text-slate-700 dark:text-neutral-300">
-                  {c.offer_id} · <span className="text-slate-500 dark:text-neutral-400">{c.aff_id}</span>
+                <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-700 dark:text-neutral-300">
+                  <span>{c.offer_id} · <span className="text-slate-500 dark:text-neutral-400">{c.aff_id}</span></span>
+                  {c.blocked && <Badge tone="red" className="text-[10px]">Blocked</Badge>}
                 </div>
                 {(c.country || c.referrer) && (
                   <div className="mt-1 truncate text-xs text-slate-500 dark:text-neutral-400">
