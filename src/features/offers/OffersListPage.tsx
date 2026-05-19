@@ -117,7 +117,7 @@ export function OffersListPage() {
             {/* Mobile card list */}
             <ul className="divide-y divide-slate-100 sm:hidden dark:divide-neutral-800">
               {query.data?.items.map((offer) => {
-                const fullUrl = offer.tracking_url ? `${offer.tracking_url}${offer.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(offer.offer_id)}` : '';
+                const fullUrl = offer.tracking_url ?? '';
                 return (
                   <li key={offer.offer_id} className="px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -178,7 +178,7 @@ export function OffersListPage() {
                 </THead>
                 <TBody>
                   {query.data?.items.map((offer) => {
-                    const fullUrl = offer.tracking_url ? `${offer.tracking_url}${offer.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(offer.offer_id)}` : '';
+                    const fullUrl = offer.tracking_url ?? '';
                     return (
                       <TR key={offer.offer_id} className="hover:bg-slate-50/60 dark:hover:bg-neutral-800/50">
                         <TD>

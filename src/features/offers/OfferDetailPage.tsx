@@ -55,7 +55,7 @@ export function OfferDetailPage() {
   }
 
   const offer = query.data;
-  const fullUrl = offer.tracking_url ? `${offer.tracking_url}${offer.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(offer.offer_id)}` : '';
+  const fullUrl = offer.tracking_url ?? '';
 
   return (
     <>
@@ -104,7 +104,7 @@ export function OfferDetailPage() {
             </div>
 
             <p className="text-xs text-slate-500 dark:text-neutral-400">
-              Affiliates can also append <Tok>&amp;s1=…&amp;s2=…</Tok> sub-parameters and ad-platform IDs
+              Affiliates can also append <Tok>?s1=…&amp;s2=…</Tok> sub-parameters and ad-platform IDs
               (<Tok>gclid</Tok>, <Tok>gbraid</Tok>, <Tok>fbclid</Tok>, etc.) — they're captured on the click and
               available as <Tok>{'{token}'}</Tok> in the affiliate destination template below.
             </p>

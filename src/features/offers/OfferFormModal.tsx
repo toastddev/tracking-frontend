@@ -116,16 +116,16 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input 
                 readOnly 
-                value={created.tracking_url ? `${created.tracking_url}${created.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(created.offer_id)}` : ''} 
+                value={created.tracking_url ?? ''} 
                 className="font-mono text-xs" 
               />
               <CopyButton 
-                value={created.tracking_url ? `${created.tracking_url}${created.tracking_url.includes('?') ? '&' : '?'}aff_id=${encodeURIComponent(created.offer_id)}` : ''} 
+                value={created.tracking_url ?? ''} 
                 className="self-start sm:self-auto" 
               />
             </div>
             <p className="hint">
-              <code>aff_id</code> is required. Affiliates can also append <code>&amp;s1=…&amp;gclid=…</code> sub-params and ad-platform IDs.
+              Affiliates can also append <code>?s1=…&amp;gclid=…</code> sub-params and ad-platform IDs.
             </p>
           </div>
         </div>
