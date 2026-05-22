@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CheckCircle2,
   Database,
+  Download,
   Info,
   Inbox,
   Megaphone,
@@ -46,6 +47,7 @@ import { fmtInr, fmtInrExact } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { reportsApi } from '@/features/reports/api';
+import { googleAdsApi } from '@/features/connections/api';
 import { type ReportRange } from '@/features/reports/ReportFilters';
 import { useDateRange } from '@/lib/dateRange';
 import type {
@@ -401,7 +403,209 @@ export function CampaignReportsPage() {
           }
         />
       )}
+
+      <GoogleAdsUploadsExportCard range={range} />
     </>
+  );
+}
+
+// ─── GAds upload audit CSV export ────────────────────────────────────────
+// Lives at the bottom of the campaigns page. Date range inherits the page's
+// current window (operator can override before downloading). Optional kind /
+// status dropdowns narrow the scan on the server. CSV columns cover every
+// push the forwarder made — sent, partial_failure, failed, skipped — for
+// both 'conversion' and 'click' kinds.
+
+type GAdsUploadKind = 'conversion' | 'click';
+type GAdsUploadStatus = 'pending' | 'sent' | 'partial_failure' | 'failed' | 'skipped';
+
+// `YYYY-MM-DD` → `Date` at start-of-UTC-day, mirroring ClicksReportTab's
+// helpers so the export uses the same UTC-day semantics as the rest of the
+// dashboard's date pickers. Operators pick calendar days, not wall-clock.
+function startOfUtcDayFromInput(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function endOfUtcDayFromInput(value: string): Date | null {
+  const d = startOfUtcDayFromInput(value);
+  if (!d) return null;
+  return new Date(d.getTime() + 24 * 60 * 60 * 1000 - 1);
+}
+
+// ISO → date input value (`YYYY-MM-DD`, UTC) for pre-filling the pickers
+// from the page's current ReportRange.
+function isoToUtcDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+function GoogleAdsUploadsExportCard({ range }: { range: ReportRange }) {
+  const [from, setFrom] = useState(() => isoToUtcDate(range.from));
+  const [to, setTo] = useState(() => isoToUtcDate(range.to));
+  const [kind, setKind] = useState<'' | GAdsUploadKind>('');
+  const [status, setStatus] = useState<'' | GAdsUploadStatus>('');
+  const [downloading, setDownloading] = useState(false);
+  const [msg, setMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+
+  // Keep the pickers in step with the page's outer range until the operator
+  // edits them. Once they edit, their choice sticks until the next page-range
+  // change — matches the ClicksReportTab override pattern.
+  const lastRangeRef = useRef({ from: range.from, to: range.to });
+  useEffect(() => {
+    if (lastRangeRef.current.from !== range.from || lastRangeRef.current.to !== range.to) {
+      lastRangeRef.current = { from: range.from, to: range.to };
+      setFrom(isoToUtcDate(range.from));
+      setTo(isoToUtcDate(range.to));
+    }
+  }, [range.from, range.to]);
+
+  async function download() {
+    setMsg(null);
+    const f = startOfUtcDayFromInput(from);
+    const t = endOfUtcDayFromInput(to);
+    if (!f || !t || f.getTime() > t.getTime()) {
+      setMsg({ tone: 'error', text: 'Pick a valid From → To range (full UTC days).' });
+      return;
+    }
+    setDownloading(true);
+    try {
+      const result = await googleAdsApi.exportUploadsCsv({
+        from: f.toISOString(),
+        to: t.toISOString(),
+        kind: kind || undefined,
+        status: status || undefined,
+      });
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+
+      const rowsLabel = result.rowCount.toLocaleString();
+      setMsg({
+        tone: 'success',
+        text: result.truncated
+          ? `Downloaded ${rowsLabel} rows (capped — narrow the window or filters for a complete export).`
+          : `Downloaded ${rowsLabel} rows.`,
+      });
+    } catch (e) {
+      setMsg({
+        tone: 'error',
+        text: `Download failed: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-neutral-100">
+            Google Ads upload report
+          </h2>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+            CSV audit of every push to Google Ads — click forwards, conversion forwards, successes, partial failures,
+            hard failures, and skips (with reason). Filter by kind/status here or open the file in Excel and slice it there.
+          </p>
+        </div>
+      </CardHeader>
+      <CardBody>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
+          <div className="min-w-[10rem]">
+            <label className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+              From (UTC)
+            </label>
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              max={to || undefined}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="min-w-[10rem]">
+            <label className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+              To (UTC)
+            </label>
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              min={from || undefined}
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="min-w-[9rem]">
+            <label className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+              Kind
+            </label>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as '' | GAdsUploadKind)}
+              className="block h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-700 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
+            >
+              <option value="">All</option>
+              <option value="conversion">Conversion</option>
+              <option value="click">Click</option>
+            </select>
+          </div>
+          <div className="min-w-[10rem]">
+            <label className="mb-0.5 block text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+              Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as '' | GAdsUploadStatus)}
+              className="block h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-700 shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
+            >
+              <option value="">All</option>
+              <option value="sent">Sent</option>
+              <option value="partial_failure">Partial failure</option>
+              <option value="failed">Failed</option>
+              <option value="skipped">Skipped</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+          <div className="sm:ml-auto">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={download}
+              disabled={downloading || !from || !to}
+              title="Download every Google Ads upload attempt in the selected window as a CSV (capped at 100,000 rows)."
+            >
+              {downloading ? <Spinner /> : <Download className="h-3.5 w-3.5" />}
+              {downloading ? 'Downloading…' : 'Download CSV'}
+            </Button>
+          </div>
+        </div>
+
+        {msg && (
+          <div
+            className={cn(
+              'mt-3 flex items-start gap-2 rounded-md border px-3 py-2 text-xs',
+              msg.tone === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
+                : 'border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300'
+            )}
+          >
+            {msg.tone === 'success'
+              ? <Check className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+              : <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />}
+            <span className="flex-1">{msg.text}</span>
+          </div>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 

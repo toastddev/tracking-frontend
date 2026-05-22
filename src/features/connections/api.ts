@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { api, apiDownload } from '@/lib/api';
 import type {
   GoogleAdsCandidate,
   GoogleAdsConnection,
@@ -128,5 +128,41 @@ export const googleAdsApi = {
 
   retryUpload(conversion_id: string) {
     return api<{ ok: true }>(`${BASE}/uploads/${encodeURIComponent(conversion_id)}/retry`, { method: 'POST' });
+  },
+
+  // CSV export of the GAds upload audit trail in a date range. Optional
+  // kind ('conversion' | 'click') and status filters narrow the scan before
+  // the response is built. Returns the raw blob plus the parsed row count /
+  // truncation flag — same shape as clicksApi.exportCsv so the campaigns
+  // page can reuse the existing download-card UX.
+  async exportUploadsCsv(params: {
+    from: string;
+    to: string;
+    kind?: 'conversion' | 'click';
+    status?: 'pending' | 'sent' | 'partial_failure' | 'failed' | 'skipped';
+  }): Promise<{
+    blob: Blob;
+    filename: string;
+    rowCount: number;
+    truncated: boolean;
+  }> {
+    const res = await apiDownload(`${BASE}/uploads/export`, {
+      query: {
+        from: params.from,
+        to: params.to,
+        kind: params.kind,
+        status: params.status,
+      },
+    });
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') ?? '';
+    const match = /filename="?([^"]+)"?/.exec(disposition);
+    const filename = match?.[1] ?? `gads_uploads_${Date.now()}.csv`;
+    return {
+      blob,
+      filename,
+      rowCount: Number(res.headers.get('x-row-count') ?? 0),
+      truncated: res.headers.get('x-export-truncated') === '1',
+    };
   },
 };
