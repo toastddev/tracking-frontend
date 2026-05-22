@@ -507,17 +507,10 @@ function GoogleAdsUploadsExportCard({ range }: { range: ReportRange }) {
 
   return (
     <Card className="mt-6">
-      <CardHeader className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-semibold text-slate-900 dark:text-neutral-100">
-            Google Ads upload report
-          </h2>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-            CSV audit of every push to Google Ads — click forwards, conversion forwards, successes, partial failures,
-            hard failures, and skips (with reason). Filter by kind/status here or open the file in Excel and slice it there.
-          </p>
-        </div>
-      </CardHeader>
+      <CardHeader
+        title="Google Ads upload report"
+        subtitle="CSV audit of every push to Google Ads — click forwards, conversion forwards, successes, partial failures, hard failures, and skips (with reason). Filter by kind/status here or open the file in Excel and slice it there."
+      />
       <CardBody>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:flex-wrap">
           <div className="min-w-[10rem]">
