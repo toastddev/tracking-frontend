@@ -55,10 +55,22 @@ export interface ClickRecord {
   // True when the click was rejected by the referer blocklist — the user was
   // shown an error page instead of being redirected to the offer.
   blocked?: boolean;
+  // True for pixel-tracked clicks whose offer_id was missing or didn't
+  // resolve to a real offer. The click row is still here (the visit was real)
+  // but rollups were skipped — fix the frontend's DIRECT_AFFILIATES mapping.
+  offer_unmapped?: boolean;
+  // Short human-readable note about offer_unmapped — shown as the badge tooltip.
+  warning?: string;
+  // 'pixel' for frontend-tracked clicks, 'redirect' (or undefined for old
+  // records) for the server-redirected flow.
+  source?: 'redirect' | 'pixel';
   created_at: string;
 }
 
-export type VerificationReason = 'click_found' | 'unknown_click_id';
+export type VerificationReason =
+  | 'click_found'
+  | 'unknown_click_id'
+  | 'click_found_offer_unmapped';
 export type ConversionSource = 'postback' | 'api';
 
 export interface ConversionRecord {

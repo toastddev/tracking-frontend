@@ -279,7 +279,9 @@ export function ClicksReportTab({ range }: Props) {
                       className={
                         c.blocked
                           ? 'bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20'
-                          : 'hover:bg-slate-50/60 dark:hover:bg-neutral-800/50'
+                          : c.offer_unmapped
+                            ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20'
+                            : 'hover:bg-slate-50/60 dark:hover:bg-neutral-800/50'
                       }
                     >
                       <TD className="whitespace-nowrap text-xs text-slate-600 dark:text-neutral-400">
@@ -295,9 +297,17 @@ export function ClicksReportTab({ range }: Props) {
                       </TD>
                       <TD className="text-sm">
                         <div className="flex items-center gap-1.5">
-                          {c.offer_id}
+                          {c.offer_id || <span className="italic text-slate-400 dark:text-neutral-500">—</span>}
                           {c.blocked && (
                             <Badge tone="red" className="text-[10px]">Blocked</Badge>
+                          )}
+                          {c.offer_unmapped && (
+                            <Badge tone="amber" className="text-[10px]" title={c.warning ?? 'offer_id not mapped'}>
+                              Unmapped
+                            </Badge>
+                          )}
+                          {c.source === 'pixel' && (
+                            <Badge tone="gray" className="text-[10px]">pixel</Badge>
                           )}
                         </div>
                       </TD>
@@ -328,7 +338,13 @@ export function ClicksReportTab({ range }: Props) {
             {query.data?.items.map((c) => (
               <li
                 key={c.click_id}
-                className={`px-4 py-3 ${c.blocked ? 'bg-red-50 dark:bg-red-500/10' : ''}`}
+                className={`px-4 py-3 ${
+                  c.blocked
+                    ? 'bg-red-50 dark:bg-red-500/10'
+                    : c.offer_unmapped
+                      ? 'bg-amber-50 dark:bg-amber-500/10'
+                      : ''
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <Link
@@ -340,8 +356,14 @@ export function ClicksReportTab({ range }: Props) {
                   <span className="text-xs text-slate-500 dark:text-neutral-400">{fmtDateTime(c.created_at)}</span>
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 text-sm text-slate-700 dark:text-neutral-300">
-                  <span>{c.offer_id} · <span className="text-slate-500 dark:text-neutral-400">{c.aff_id}</span></span>
+                  <span>{c.offer_id || '—'} · <span className="text-slate-500 dark:text-neutral-400">{c.aff_id}</span></span>
                   {c.blocked && <Badge tone="red" className="text-[10px]">Blocked</Badge>}
+                  {c.offer_unmapped && (
+                    <Badge tone="amber" className="text-[10px]" title={c.warning ?? 'offer_id not mapped'}>
+                      Unmapped
+                    </Badge>
+                  )}
+                  {c.source === 'pixel' && <Badge tone="gray" className="text-[10px]">pixel</Badge>}
                 </div>
                 {(c.country || c.referrer) && (
                   <div className="mt-1 truncate text-xs text-slate-500 dark:text-neutral-400">
