@@ -42,6 +42,15 @@ export const facebookAdsApi = {
     });
   },
 
+  // Server-side OAuth callback flow: the backend already exchanged Meta's
+  // code → tokens at the public /oauth/facebook/callback route and stashed
+  // the result in a Firestore session. The frontend (now back on a normal
+  // in-app page with auth intact) calls this to fetch the candidates +
+  // grant_token and continue the modal flow.
+  consumeOauthSession(session_id: string) {
+    return api<FbExchangeResponse>(`${BASE}/oauth/consume-session/${encodeURIComponent(session_id)}`);
+  },
+
   finalize(payload: {
     grant_token: string;
     picks: Array<{

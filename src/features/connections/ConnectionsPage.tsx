@@ -1,15 +1,27 @@
-import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
+import { AlertCircle } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { CenteredSpinner } from '@/components/ui/Spinner';
+import { ApiError } from '@/lib/api';
 import { googleAdsApi } from './api';
 import { GoogleAdsConnectCard } from './GoogleAdsConnectCard';
-import { facebookAdsApi } from './facebook/api';
+import { facebookAdsApi, type FbExchangeResponse } from './facebook/api';
 import { FacebookConnectCard } from './facebook/FacebookConnectCard';
+import { FacebookAccountsModal } from './facebook/FacebookAccountsModal';
 
 export function ConnectionsPage() {
   const [params, setParams] = useSearchParams();
+  const qc = useQueryClient();
+  const sessionRunOnce = useRef(false);
+
+  // OAuth callback round-trip lands the user here with one of:
+  //   ?fb_oauth_session=<id>            success — exchange session for picker
+  //   ?fb_oauth_error=<reason>          failure — surface to operator
+  // See backend handleCallback for how the URL params are produced.
+  const [fbCallback, setFbCallback] = useState<FbExchangeResponse | null>(null);
+  const [fbCallbackError, setFbCallbackError] = useState<string | null>(null);
 
   useEffect(() => {
     if (params.has('status')) {
@@ -17,6 +29,47 @@ export function ConnectionsPage() {
       next.delete('status');
       next.delete('reason');
       setParams(next, { replace: true });
+    }
+  }, [params, setParams]);
+
+  // Handle the OAuth session redirect once per mount. A double-fire here
+  // would 410 the second call (session already consumed), so the ref guards
+  // React-StrictMode double-invocation in dev.
+  useEffect(() => {
+    if (sessionRunOnce.current) return;
+    const sessionId = params.get('fb_oauth_session');
+    const errorCode = params.get('fb_oauth_error');
+    const errorMsg = params.get('fb_oauth_error_message');
+
+    if (errorCode) {
+      sessionRunOnce.current = true;
+      setFbCallbackError(errorMsg ? `${errorCode}: ${errorMsg}` : errorCode);
+      const next = new URLSearchParams(params);
+      next.delete('fb_oauth_error');
+      next.delete('fb_oauth_error_message');
+      setParams(next, { replace: true });
+      return;
+    }
+
+    if (sessionId) {
+      sessionRunOnce.current = true;
+      facebookAdsApi.consumeOauthSession(sessionId)
+        .then((res) => {
+          setFbCallback(res);
+          // Strip the param immediately so a refresh doesn't try to re-consume.
+          const next = new URLSearchParams(params);
+          next.delete('fb_oauth_session');
+          setParams(next, { replace: true });
+        })
+        .catch((err) => {
+          const msg = err instanceof ApiError
+            ? err.code ?? err.message
+            : err instanceof Error ? err.message : 'oauth_consume_failed';
+          setFbCallbackError(msg);
+          const next = new URLSearchParams(params);
+          next.delete('fb_oauth_session');
+          setParams(next, { replace: true });
+        });
     }
   }, [params, setParams]);
 
@@ -38,12 +91,34 @@ export function ConnectionsPage() {
   const fbBusiness = fbConnections.filter((c) => c.type === 'business');
   const fbAdAccounts = fbConnections.filter((c) => c.type === 'ad_account');
 
+  function dismissModal() {
+    setFbCallback(null);
+    qc.invalidateQueries({ queryKey: ['fb-connections'] });
+  }
+
   return (
     <>
       <PageHeader
         title="Connections"
         description="Forward conversions and Google-tagged outbound clicks from this tracker to outside ad platforms."
       />
+
+      {fbCallbackError && (
+        <div className="mb-4 flex items-start gap-2 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <div className="font-medium">Couldn't finish connecting Facebook.</div>
+            <div className="mt-0.5 text-xs">{fbCallbackError}</div>
+          </div>
+          <button
+            className="ml-auto text-xs underline hover:no-underline"
+            onClick={() => setFbCallbackError(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="space-y-6">
         <GoogleAdsConnectCard
           type="mcc"
@@ -94,6 +169,18 @@ export function ConnectionsPage() {
           connections={fbAdAccounts}
         />
       </div>
+
+      {fbCallback && (
+        <FacebookAccountsModal
+          open
+          onClose={dismissModal}
+          onFinalized={dismissModal}
+          type={fbCallback.type}
+          grantToken={fbCallback.grant_token}
+          metaUserEmail={fbCallback.meta_user_email}
+          candidates={fbCallback.candidates}
+        />
+      )}
     </>
   );
 }
