@@ -180,7 +180,7 @@ export function FbCampaignReportsPage() {
   if (summaryQ.isError) {
     return (
       <EmptyState
-        icon={AlertCircle}
+        icon={<AlertCircle className="h-8 w-8" />}
         title="Couldn't load FB campaign reports"
         description={summaryQ.error instanceof Error ? summaryQ.error.message : 'Unknown error'}
       />
@@ -198,15 +198,9 @@ export function FbCampaignReportsPage() {
         <Card>
           <CardBody>
             <EmptyState
-              icon={Info}
+              icon={<Info className="h-8 w-8" />}
               title="No FB campaign data yet"
-              description={
-                <>
-                  Click clicks haven't been attributed to any Facebook campaign in this window. Once you connect an ad
-                  account on the Connections page and either run the sync below or wait for the next refresh, campaigns
-                  will appear here.
-                </>
-              }
+              description="No clicks have been attributed to any Facebook campaign in this window. Once you connect an ad account on the Connections page and either run the sync below or wait for the next refresh, campaigns will appear here."
             />
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex-1">
@@ -329,10 +323,12 @@ export function FbCampaignReportsPage() {
                     background: theme === 'dark' ? '#171717' : '#fff',
                     border: `1px solid ${stroke}`,
                   }}
-                  formatter={(value: number | string, name: string) => {
-                    if (typeof value !== 'number') return value;
-                    if (name === 'Conversions' || name === 'Clicks') return fmtCount(value);
-                    return fmtInr(value);
+                  formatter={(value, name) => {
+                    if (value == null) return '';
+                    const n = typeof value === 'number' ? value : Number(value);
+                    if (!Number.isFinite(n)) return String(value);
+                    if (name === 'Conversions' || name === 'Clicks') return fmtCount(n);
+                    return fmtInr(n);
                   }}
                 />
                 <Legend />

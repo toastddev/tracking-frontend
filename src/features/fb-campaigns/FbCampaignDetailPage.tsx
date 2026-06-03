@@ -93,7 +93,7 @@ export function FbCampaignDetailPage() {
   if (dailyQ.isError || !dailyQ.data) {
     return (
       <EmptyState
-        icon={Info}
+        icon={<Info className="h-8 w-8" />}
         title="Couldn't load campaign"
         description={dailyQ.error instanceof Error ? dailyQ.error.message : 'Unknown error'}
       />
@@ -103,17 +103,15 @@ export function FbCampaignDetailPage() {
   const head = filtered[0] ?? dailyQ.data.items[0];
   const stroke = theme === 'dark' ? '#52525b' : '#cbd5e1';
   const tickFill = theme === 'dark' ? '#a3a3a3' : '#475569';
+  const subtitle = id === 'fb_untagged'
+    ? `${id} · synthetic (clicks with fbclid/fbc/fbp but no campaign tag)`
+    : (id ?? '');
 
   return (
     <>
       <PageHeader
         title={head?.campaign_name ?? id ?? ''}
-        description={
-          <>
-            <code className="font-mono text-xs">{id}</code>
-            {id === 'fb_untagged' && <> · synthetic (clicks with fbclid/fbc/fbp but no campaign tag)</>}
-          </>
-        }
+        description={subtitle}
         actions={
           <Button variant="ghost" onClick={() => navigate('/fb-campaigns')}>
             <ArrowLeft className="h-4 w-4" /> Back to FB Campaigns
