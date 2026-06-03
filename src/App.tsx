@@ -16,6 +16,9 @@ import { OfferReportDetailPage } from '@/features/reports/OfferReportDetailPage'
 import { PostbackReportDetailPage } from '@/features/reports/PostbackReportDetailPage';
 import { CampaignReportsPage } from '@/features/campaigns/CampaignReportsPage';
 import { CampaignDetailPage } from '@/features/campaigns/CampaignDetailPage';
+import { FbCampaignReportsPage } from '@/features/fb-campaigns/FbCampaignReportsPage';
+import { FbCampaignDetailPage } from '@/features/fb-campaigns/FbCampaignDetailPage';
+import { FacebookOAuthCallbackPage } from '@/features/connections/facebook/FacebookOAuthCallbackPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 
 export default function App() {
@@ -36,6 +39,8 @@ export default function App() {
         <Route path="/reports/postbacks/:id" element={<PostbackReportDetailPage />} />
         <Route path="/campaigns" element={<CampaignReportsPage />} />
         <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
+        <Route path="/fb-campaigns" element={<FbCampaignReportsPage />} />
+        <Route path="/fb-campaigns/:id" element={<FbCampaignDetailPage />} />
         <Route path="/clicks/:id" element={<ClickDetailPage />} />
         <Route path="/offers" element={<OffersListPage />} />
         <Route path="/offers/:id" element={<OfferDetailPage />} />
@@ -45,6 +50,7 @@ export default function App() {
         <Route path="/aff-api/:id" element={<AffApiDetailPage />} />
         <Route path="/connections" element={<ConnectionsPage />} />
         <Route path="/oauth/google-ads/callback" element={<GoogleAdsOAuthCallbackPage />} />
+        <Route path="/oauth/facebook/callback" element={<FacebookOAuthCallbackPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

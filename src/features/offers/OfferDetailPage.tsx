@@ -16,6 +16,7 @@ import { offersApi } from './api';
 import { OfferFormModal } from './OfferFormModal';
 import { OfferClicks } from './OfferClicks';
 import { GoogleAdsRoutingCard } from '@/features/connections/GoogleAdsRoutingCard';
+import { FacebookRoutingCard } from '@/features/connections/facebook/FacebookRoutingCard';
 
 export function OfferDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -137,8 +138,9 @@ export function OfferDetailPage() {
         </Card>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <GoogleAdsRoutingCard scopeType="offer" scopeId={offer.offer_id} />
+        <FacebookRoutingCard scopeType="offer" scopeId={offer.offer_id} />
       </div>
 
       <div className="mt-8">

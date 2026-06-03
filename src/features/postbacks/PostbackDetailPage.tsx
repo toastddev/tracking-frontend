@@ -17,6 +17,7 @@ import { PostbackFormModal } from './PostbackFormModal';
 import { EventLog } from './EventLog';
 import { buildExampleUrl } from './utils';
 import { GoogleAdsRoutingCard } from '@/features/connections/GoogleAdsRoutingCard';
+import { FacebookRoutingCard } from '@/features/connections/facebook/FacebookRoutingCard';
 
 export function PostbackDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
@@ -161,8 +162,9 @@ export function PostbackDetailPage() {
           </CardBody>
         </Card>
 
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 space-y-6">
           <GoogleAdsRoutingCard scopeType="network" scopeId={network.network_id} />
+          <FacebookRoutingCard scopeType="network" scopeId={network.network_id} />
         </div>
 
         <Card className="lg:col-span-3">
