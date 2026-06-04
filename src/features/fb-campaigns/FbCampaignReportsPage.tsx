@@ -954,8 +954,10 @@ function CampaignRow({ row, onOpen }: { row: FbCampaignReportSummary; onOpen: ()
     : 'text-slate-500 dark:text-neutral-400';
   const hasFb = (row.fb_impressions ?? 0) > 0 || (row.fb_clicks ?? 0) > 0;
   const isUntagged = row.campaign_id === 'fb_untagged';
+  const isNoMatch = row.campaign_id === 'no_match_no_fbclid_or_gclid';
   const sourceBadgeLabel =
-    row.source === 'utm_id' ? 'utm_id'
+    isNoMatch ? 'No match (excluded from totals)'
+    : row.source === 'utm_id' ? 'utm_id'
     : row.source === 'utm_campaign' ? 'UTM'
     : isUntagged ? 'Untagged'
     : 'Facebook';
@@ -975,7 +977,7 @@ function CampaignRow({ row, onOpen }: { row: FbCampaignReportSummary; onOpen: ()
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-neutral-500">
             <span className="font-mono">{row.campaign_id}</span>
-            <Badge tone={isUntagged ? 'amber' : row.source === 'fb_campaign_id' || row.source === 'utm_id' ? 'blue' : 'amber'}>
+            <Badge tone={isNoMatch ? 'gray' : isUntagged ? 'amber' : row.source === 'fb_campaign_id' || row.source === 'utm_id' ? 'blue' : 'amber'}>
               {sourceBadgeLabel}
             </Badge>
           </div>
