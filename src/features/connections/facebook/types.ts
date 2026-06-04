@@ -88,7 +88,7 @@ export interface FacebookUpload {
   dataset_id?: string;
   event_name?: string;
   event_id?: string;
-  identifier_type?: 'fbc' | 'fbp' | 'fbclid';
+  identifier_type?: 'fbc' | 'fbp' | 'fbclid' | 'ip_only';
   identifier_value?: string;
   status: FacebookUploadStatus;
   attempts: number;
