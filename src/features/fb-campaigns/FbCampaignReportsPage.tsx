@@ -44,6 +44,8 @@ import { fmtInr, fmtInrExact } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { useDateRange } from '@/lib/dateRange';
+import { CampaignsFlatTable } from '@/features/campaigns/CampaignsFlatTable';
+import { ViewToggle } from '@/features/campaigns/ViewToggle';
 import {
   facebookAdsApi,
   fbCampaignReportsApi,
@@ -375,6 +377,7 @@ function Body({
   onOpenCampaign: (id: string) => void;
 }) {
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'campaigns' | 'offers'>('campaigns');
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'desc' ? -1 : 1;
@@ -428,16 +431,31 @@ function Body({
         <RoasTrendChart series={dailyAggregate} />
       </div>
 
-      <CampaignsTable
-        campaigns={filteredSorted}
-        totalCampaignCount={sorted.length}
-        search={search}
-        onSearchChange={setSearch}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSort={onSort}
-        onOpen={onOpenCampaign}
+      <ViewToggle
+        value={viewMode}
+        onChange={setViewMode}
+        campaignsLabel="Detailed (FB split)"
+        offersLabel="Flat layout"
       />
+
+      {viewMode === 'campaigns' ? (
+        <CampaignsTable
+          campaigns={filteredSorted}
+          totalCampaignCount={sorted.length}
+          search={search}
+          onSearchChange={setSearch}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={onSort}
+          onOpen={onOpenCampaign}
+        />
+      ) : (
+        <CampaignsFlatTable
+          platform="facebook"
+          campaigns={sorted}
+          onOpenCampaign={onOpenCampaign}
+        />
+      )}
     </div>
   );
 }

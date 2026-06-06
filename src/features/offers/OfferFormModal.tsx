@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, X } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
+import { Spinner } from '@/components/ui/Spinner';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { ApiError } from '@/lib/api';
 import { offersApi } from './api';
@@ -17,6 +19,9 @@ interface Props {
 
 const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,63}$/;
 
+type TrafficSource = 'google' | 'facebook' | '';
+type LinkType = 'direct' | 'normal' | '';
+
 export function OfferFormModal({ open, onClose, initial }: Props) {
   const editing = !!initial;
   const qc = useQueryClient();
@@ -25,6 +30,14 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
   const [baseUrl, setBaseUrl] = useState('');
   const [status, setStatus] = useState<'active' | 'paused'>('active');
   const [defaultParamsText, setDefaultParamsText] = useState('');
+  // Linkage state — kept as '' to represent "unset". Submit converts '' → null
+  // on update (clears the field) or omits the field on create.
+  const [trafficSource, setTrafficSource] = useState<TrafficSource>('');
+  const [linkedCampaignId, setLinkedCampaignId] = useState('');
+  const [linkedCampaignName, setLinkedCampaignName] = useState('');
+  const [linkType, setLinkType] = useState<LinkType>('');
+  const [campaignQuery, setCampaignQuery] = useState('');
+  const [campaignPickerOpen, setCampaignPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<Offer | null>(null);
 
@@ -38,14 +51,39 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
       setBaseUrl(initial.base_url ?? '');
       setStatus(initial.status ?? 'active');
       setDefaultParamsText(JSON.stringify(initial.default_params ?? {}, null, 2));
+      setTrafficSource((initial.traffic_source as TrafficSource) ?? '');
+      setLinkedCampaignId(initial.linked_campaign_id ?? '');
+      setLinkedCampaignName('');
+      setLinkType((initial.link_type as LinkType) ?? '');
     } else {
       setOfferId('');
       setName('');
       setBaseUrl('');
       setStatus('active');
       setDefaultParamsText('');
+      setTrafficSource('');
+      setLinkedCampaignId('');
+      setLinkedCampaignName('');
+      setLinkType('');
     }
+    setCampaignQuery('');
+    setCampaignPickerOpen(false);
   }, [open, initial]);
+
+  // Debounced live search for the campaign picker. Only enabled once a source
+  // is chosen so we don't fire useless lookups while the form is half-filled.
+  const debouncedQuery = useDebounced(campaignQuery, 200);
+  const campaignSearch = useQuery({
+    queryKey: ['campaign-search', trafficSource, debouncedQuery],
+    queryFn: () =>
+      offersApi.searchCampaigns({
+        source: trafficSource as 'google' | 'facebook',
+        q: debouncedQuery || undefined,
+        limit: 25,
+      }),
+    enabled: open && campaignPickerOpen && (trafficSource === 'google' || trafficSource === 'facebook'),
+    staleTime: 30_000,
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -63,10 +101,30 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
         }
       }
       if (editing) {
-        return offersApi.update(initial!.offer_id, { name, base_url: baseUrl, status, default_params });
+        // Send all three linkage fields every time so the operator can clear
+        // a previously-set link by emptying the picker. '' → null erases it
+        // server-side; a set value writes through.
+        return offersApi.update(initial!.offer_id, {
+          name,
+          base_url: baseUrl,
+          status,
+          default_params,
+          traffic_source: trafficSource === '' ? null : trafficSource,
+          linked_campaign_id: linkedCampaignId === '' ? null : linkedCampaignId,
+          link_type: linkType === '' ? null : linkType,
+        });
       }
       if (!SLUG_RE.test(offerId)) throw new Error('Offer id must be lowercase letters/digits/_- (2-64 chars)');
-      return offersApi.create({ offer_id: offerId, name, base_url: baseUrl, status, default_params });
+      return offersApi.create({
+        offer_id: offerId,
+        name,
+        base_url: baseUrl,
+        status,
+        default_params,
+        ...(trafficSource ? { traffic_source: trafficSource } : {}),
+        ...(linkedCampaignId ? { linked_campaign_id: linkedCampaignId } : {}),
+        ...(linkType ? { link_type: linkType } : {}),
+      });
     },
     onSuccess: (offer) => {
       qc.invalidateQueries({ queryKey: ['offers'] });
@@ -85,6 +143,18 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
     e.preventDefault();
     setError(null);
     mutation.mutate();
+  }
+
+  function pickCampaign(c: { campaign_id: string; campaign_name?: string }) {
+    setLinkedCampaignId(c.campaign_id);
+    setLinkedCampaignName(c.campaign_name ?? '');
+    setCampaignPickerOpen(false);
+    setCampaignQuery('');
+  }
+
+  function clearCampaign() {
+    setLinkedCampaignId('');
+    setLinkedCampaignName('');
   }
 
   return (
@@ -114,14 +184,14 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
           <div>
             <label className="label">Tracking URL</label>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input 
-                readOnly 
-                value={created.tracking_url ?? ''} 
-                className="font-mono text-xs" 
+              <Input
+                readOnly
+                value={created.tracking_url ?? ''}
+                className="font-mono text-xs"
               />
-              <CopyButton 
-                value={created.tracking_url ?? ''} 
-                className="self-start sm:self-auto" 
+              <CopyButton
+                value={created.tracking_url ?? ''}
+                className="self-start sm:self-auto"
               />
             </div>
             <p className="hint">
@@ -181,6 +251,138 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
             />
           </div>
 
+          {/* Linkage — for ease only, doesn't change attribution */}
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 dark:border-neutral-800 dark:bg-neutral-900/40">
+            <div className="mb-2 flex items-baseline justify-between">
+              <div className="text-sm font-medium text-slate-700 dark:text-neutral-200">Campaign linkage</div>
+              <div className="text-xs text-slate-500 dark:text-neutral-400">organisational · doesn't affect attribution</div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label className="label" htmlFor="traffic_source">Traffic source</label>
+                <Select
+                  id="traffic_source"
+                  value={trafficSource}
+                  onChange={(e) => {
+                    const next = e.target.value as TrafficSource;
+                    setTrafficSource(next);
+                    // Drop any previously picked campaign when the source
+                    // changes — campaigns are filtered by source so the
+                    // existing choice is no longer valid.
+                    if (next !== trafficSource) clearCampaign();
+                  }}
+                >
+                  <option value="">— none —</option>
+                  <option value="google">Google Ads</option>
+                  <option value="facebook">Facebook</option>
+                </Select>
+              </div>
+              <div>
+                <label className="label" htmlFor="link_type">Link type</label>
+                <Select
+                  id="link_type"
+                  value={linkType}
+                  onChange={(e) => setLinkType(e.target.value as LinkType)}
+                >
+                  <option value="">— none —</option>
+                  <option value="direct">Direct</option>
+                  <option value="normal">Normal</option>
+                </Select>
+              </div>
+              <div>
+                <label className="label">Linked campaign</label>
+                {linkedCampaignId ? (
+                  <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800">
+                    <div className="min-w-0 flex-1 truncate">
+                      <span className="font-medium text-slate-900 dark:text-neutral-100">
+                        {linkedCampaignName || linkedCampaignId}
+                      </span>
+                      {linkedCampaignName && (
+                        <span className="ml-1 text-xs text-slate-500 dark:text-neutral-400">
+                          ({linkedCampaignId})
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={clearCampaign}
+                      className="text-slate-400 hover:text-slate-700 dark:text-neutral-500 dark:hover:text-neutral-200"
+                      title="Unlink"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setCampaignPickerOpen(true)}
+                    disabled={!trafficSource}
+                    className="w-full justify-start"
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                    {trafficSource ? 'Choose a campaign…' : 'Pick a source first'}
+                  </Button>
+                )}
+              </div>
+            </div>
+            {campaignPickerOpen && (trafficSource === 'google' || trafficSource === 'facebook') && (
+              <div className="mt-3 rounded-md border border-slate-200 bg-white p-2 dark:border-neutral-700 dark:bg-neutral-800">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-neutral-500" />
+                  <Input
+                    autoFocus
+                    value={campaignQuery}
+                    onChange={(e) => setCampaignQuery(e.target.value)}
+                    placeholder={`Search ${trafficSource === 'google' ? 'Google Ads' : 'Facebook'} campaigns…`}
+                    className="pl-8"
+                  />
+                </div>
+                <div className="mt-2 max-h-56 overflow-y-auto">
+                  {campaignSearch.isLoading ? (
+                    <div className="flex items-center justify-center px-2 py-4">
+                      <Spinner className="text-slate-400 dark:text-neutral-500" />
+                    </div>
+                  ) : campaignSearch.data && campaignSearch.data.items.length === 0 ? (
+                    <div className="px-2 py-3 text-center text-sm text-slate-500 dark:text-neutral-400">
+                      No campaigns match.
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-slate-100 dark:divide-neutral-700">
+                      {campaignSearch.data?.items.map((c) => (
+                        <li key={c.campaign_id}>
+                          <button
+                            type="button"
+                            onClick={() => pickCampaign(c)}
+                            className="block w-full px-2 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-neutral-700/50"
+                          >
+                            <div className="font-medium text-slate-900 dark:text-neutral-100">
+                              {c.campaign_name || c.campaign_id}
+                            </div>
+                            {c.campaign_name && (
+                              <div className="text-xs text-slate-500 dark:text-neutral-400">{c.campaign_id}</div>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCampaignPickerOpen(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {error && (
             <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-100 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-500/30">
               {error}
@@ -190,4 +392,13 @@ export function OfferFormModal({ open, onClose, initial }: Props) {
       )}
     </Modal>
   );
+}
+
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(id);
+  }, [value, ms]);
+  return debounced;
 }

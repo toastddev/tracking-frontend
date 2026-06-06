@@ -47,6 +47,8 @@ import { fmtInr, fmtInrExact } from '@/lib/format';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/cn';
 import { reportsApi } from '@/features/reports/api';
+import { CampaignsFlatTable } from './CampaignsFlatTable';
+import { ViewToggle } from './ViewToggle';
 import { googleAdsApi } from '@/features/connections/api';
 import { type ReportRange } from '@/features/reports/ReportFilters';
 import { useDateRange } from '@/lib/dateRange';
@@ -643,6 +645,7 @@ function Body({
 }) {
   const [drillMetric, setDrillMetric] = useState<DrilldownMetric | null>(null);
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'campaigns' | 'offers'>('campaigns');
 
   const sorted = useMemo(() => {
     const dir = sortDir === 'desc' ? -1 : 1;
@@ -701,16 +704,31 @@ function Body({
         <RoasTrendChart series={dailyAggregate} />
       </div>
 
-      <CampaignsTable
-        campaigns={filteredSorted}
-        totalCampaignCount={sorted.length}
-        search={search}
-        onSearchChange={setSearch}
-        sortKey={sortKey}
-        sortDir={sortDir}
-        onSort={onSort}
-        onOpen={onOpenCampaign}
+      <ViewToggle
+        value={viewMode}
+        onChange={setViewMode}
+        campaignsLabel="Detailed (GAds split)"
+        offersLabel="Flat layout"
       />
+
+      {viewMode === 'campaigns' ? (
+        <CampaignsTable
+          campaigns={filteredSorted}
+          totalCampaignCount={sorted.length}
+          search={search}
+          onSearchChange={setSearch}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={onSort}
+          onOpen={onOpenCampaign}
+        />
+      ) : (
+        <CampaignsFlatTable
+          platform="google"
+          campaigns={sorted}
+          onOpenCampaign={onOpenCampaign}
+        />
+      )}
 
       <MetricDrilldownModal
         metric={drillMetric}

@@ -231,6 +231,7 @@ export interface FbCampaignReportSummary {
   pending: number;
   rejected: number;
   revenue: number;
+  revenue_usd: number;
   spend: number;
   profit: number;
   cvr: number;

@@ -6,9 +6,20 @@ export interface Offer {
   base_url: string;
   status: Status;
   default_params?: Record<string, string>;
+  // Operator-set linkage to an upstream ad campaign. Purely organisational —
+  // attribution math still runs off the URL params on the click itself.
+  traffic_source?: 'google' | 'facebook';
+  linked_campaign_id?: string;
+  link_type?: 'direct' | 'normal';
   created_at?: string;
   updated_at?: string;
   tracking_url?: string;
+}
+
+export interface CampaignSearchResult {
+  campaign_id: string;
+  campaign_name?: string;
+  source: string;
 }
 
 export interface Network {
@@ -557,6 +568,7 @@ export interface CampaignReportSummary {
   pending: number;
   rejected: number;
   revenue: number;
+  revenue_usd: number;
   spend: number;
   profit: number;
   cvr: number;
