@@ -29,6 +29,7 @@ export function OffersListPage() {
   const [q, setQ] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [cursorStack, setCursorStack] = useState<(string | null)[]>([null]);
+  const [jumpingLast, setJumpingLast] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteOffer, setDeleteOffer] = useState<{ id: string; name: string } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -92,6 +93,34 @@ export function OffersListPage() {
 
   const query = searching ? poolQuery : pagedQuery;
   const displayItems = searching ? (fuzzyResults ?? []) : (pagedQuery.data?.items ?? []);
+
+  // Cursor pagination has no total count, so "jump to last" walks forward
+  // through nextCursor until the backend stops returning one, accumulating the
+  // full cursor stack so Prev still works afterwards. fetchQuery reuses the
+  // React Query cache for pages already visited. Capped to avoid a runaway loop
+  // if the backend ever returned a self-referential cursor.
+  const goLast = async () => {
+    if (jumpingLast) return;
+    setJumpingLast(true);
+    try {
+      const stack = [...cursorStack];
+      let next = pagedQuery.data?.nextCursor ?? null;
+      let guard = 0;
+      while (next && guard < 1000) {
+        const c = next;
+        stack.push(c);
+        const page = await qc.fetchQuery({
+          queryKey: ['offers', { cursor: c }],
+          queryFn: () => offersApi.list({ cursor: c, limit: PAGE_SIZE }),
+        });
+        next = page.nextCursor;
+        guard += 1;
+      }
+      setCursorStack(stack);
+    } finally {
+      setJumpingLast(false);
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => offersApi.delete(id),
@@ -327,8 +356,11 @@ export function OffersListPage() {
               <Pagination
                 hasPrev={cursorStack.length > 1}
                 hasNext={!!pagedQuery.data?.nextCursor}
+                busy={jumpingLast}
+                onFirst={() => setCursorStack([null])}
                 onPrev={() => setCursorStack((s) => s.slice(0, -1))}
                 onNext={() => pagedQuery.data?.nextCursor && setCursorStack((s) => [...s, pagedQuery.data!.nextCursor!])}
+                onLast={goLast}
                 pageLabel={`Page ${cursorStack.length}`}
               />
             )}
