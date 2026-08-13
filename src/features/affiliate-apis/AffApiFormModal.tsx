@@ -72,6 +72,7 @@ interface FormState {
   m_txn_id: string;
   m_event_time: string;
   m_default_status: string;
+  m_default_currency: string;
   // Schedule
   enabled: boolean;
   runs_per_day: number;
@@ -94,6 +95,7 @@ const DEFAULTS: FormState = {
   m_items: 'data', m_external_id: 'id', m_click_id: 'click_id',
   m_payout: 'payout', m_currency: 'currency', m_status: 'status',
   m_txn_id: 'transaction_id', m_event_time: 'event_time', m_default_status: 'approved',
+  m_default_currency: '',
   enabled: true, runs_per_day: 4,
   timeout_ms: '30000', max_records_per_run: '50000',
 };
@@ -189,6 +191,7 @@ function fromInitial(api: AffiliateApi): FormState {
     m_txn_id: api.mapping.txn_id_path ?? '',
     m_event_time: api.mapping.event_time_path ?? '',
     m_default_status: api.mapping.default_status ?? 'approved',
+    m_default_currency: api.mapping.default_currency ?? '',
     enabled: api.schedule.enabled,
     runs_per_day: api.schedule.runs_per_day,
     timeout_ms: String(api.timeout_ms ?? 30_000),
@@ -272,6 +275,7 @@ export function AffApiFormModal({ open, onClose, initial }: Props) {
         txn_id_path: form.m_txn_id.trim() || undefined,
         event_time_path: form.m_event_time.trim() || undefined,
         default_status: form.m_default_status.trim() || undefined,
+        default_currency: form.m_default_currency.trim().toUpperCase() || undefined,
       },
       schedule: { enabled: form.enabled, runs_per_day: form.runs_per_day },
       timeout_ms: form.timeout_ms ? Number(form.timeout_ms) : undefined,
@@ -583,10 +587,17 @@ export function AffApiFormModal({ open, onClose, initial }: Props) {
             <Field label="Transaction ID path"><Input value={form.m_txn_id} onChange={(e) => patch('m_txn_id', e.target.value)} placeholder="transaction_id" /></Field>
             <Field label="Event time path"><Input value={form.m_event_time} onChange={(e) => patch('m_event_time', e.target.value)} placeholder="event_time" /></Field>
             <Field label="Default status"><Input value={form.m_default_status} onChange={(e) => patch('m_default_status', e.target.value)} placeholder="approved" /></Field>
+            <Field label="Default currency"><Input value={form.m_default_currency} onChange={(e) => patch('m_default_currency', e.target.value)} placeholder="USD" maxLength={3} /></Field>
           </div>
           <p className="hint mt-1">
             Paths are dot/bracket — e.g. <code>data.items</code>, <code>edges[0].node.id</code>. For GraphQL connections use{' '}
             <code>data.<i>field</i>.edges</code> as items_path and <code>node.<i>field</i></code> for sub-paths.
+          </p>
+          <p className="hint mt-1">
+            <b>Default currency</b> is the ISO code assumed when the currency path is empty or
+            resolves to nothing — set it to <code>CNY</code> for AliExpress, <code>USD</code> for
+            most others. If it's wrong, every payout from this API is mis-priced in reports and in
+            the Google&nbsp;Ads / Meta conversion uploads.
           </p>
         </Section>
 

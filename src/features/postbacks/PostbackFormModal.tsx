@@ -43,6 +43,7 @@ interface FormState {
   mapping_txn_id: string;
   mapping_timestamp: string;
   default_status: string;
+  default_currency: string;
   postback_timezone: string;
   postback_api_id: string;
   extras: ExtraRow[];
@@ -79,6 +80,7 @@ const empty: FormState = {
   network_id: '', name: '', status: 'active',
   mapping_click_id: 'click_id', mapping_payout: '', mapping_currency: '',
   mapping_status: '', mapping_txn_id: '', mapping_timestamp: '', default_status: 'approved',
+  default_currency: '',
   postback_timezone: '',
   postback_api_id: '',
   extras: [],
@@ -120,6 +122,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
         mapping_txn_id: initial.mapping_txn_id ?? '',
         mapping_timestamp: initial.mapping_timestamp ?? '',
         default_status: initial.default_status ?? 'approved',
+        default_currency: initial.default_currency ?? '',
         postback_timezone: initial.postback_timezone ?? '',
         postback_api_id: initial.postback_api_id ?? '',
         extras: extrasFromNetwork(initial),
@@ -194,6 +197,7 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
         mapping_txn_id: form.mapping_txn_id.trim() || undefined,
         mapping_timestamp: form.mapping_timestamp.trim() || undefined,
         default_status: form.default_status.trim() || undefined,
+        default_currency: form.default_currency.trim().toUpperCase() || undefined,
         postback_timezone: form.postback_timezone.trim() || undefined,
         postback_api_id: form.postback_api_id.trim() || undefined,
         extra_mappings: extras.value,
@@ -315,6 +319,20 @@ export function PostbackFormModal({ open, onClose, initial }: Props) {
                 onChange={update('default_status')}
                 placeholder="approved"
               />
+              <div>
+                <Field
+                  label="Payout currency fallback"
+                  value={form.default_currency}
+                  onChange={update('default_currency')}
+                  placeholder="USD"
+                  maxLength={3}
+                />
+                <p className="hint">
+                  ISO code assumed when the network sends no <code>currency</code> param (e.g.{' '}
+                  <code>CNY</code> for AliExpress). Leave blank for USD. Getting this wrong
+                  mis-prices every conversion from this network in reports and in Google&nbsp;Ads.
+                </p>
+              </div>
               <div>
                 <label className="label">Postback timezone (Google Ads only)</label>
                 <Select value={form.postback_timezone} onChange={update('postback_timezone')}>

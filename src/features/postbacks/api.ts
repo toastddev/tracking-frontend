@@ -27,6 +27,7 @@ export interface NetworkUpsert {
   mapping_timestamp?: string;
   extra_mappings?: Record<string, string>;
   default_status?: string;
+  default_currency?: string;
   postback_timezone?: string;
   postback_api_id?: string;
 }

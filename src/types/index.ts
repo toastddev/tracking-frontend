@@ -34,6 +34,10 @@ export interface Network {
   mapping_timestamp?: string;
   extra_mappings?: Record<string, string>;
   default_status?: string;
+  // ISO-4217 currency assumed when a postback carries no `currency` param.
+  // Must be set for any network that doesn't pay in USD, or its payouts get
+  // priced as dollars everywhere downstream.
+  default_currency?: string;
   postback_timezone?: string;
   postback_api_id?: string;
   created_at?: string;
@@ -797,6 +801,9 @@ export interface AffiliateApiMapping {
   event_time_path?: string;
   status_map?: Record<string, string>;
   default_status?: string;
+  // ISO-4217 currency assumed when `currency_path` is unset or resolves to
+  // nothing (e.g. AliExpress pays CNY but doesn't tag the row).
+  default_currency?: string;
 }
 
 export interface AffiliateApiSchedule {
