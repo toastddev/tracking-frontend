@@ -224,9 +224,8 @@ export function GoogleAdsRoutingCard({ scopeType, scopeId }: Props) {
         </div>
 
         {mccConnections.length > 0 && (
-          <div className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-500/30">
-            <strong>Heads up:</strong> you also have an MCC connection. Conversions and clicks fire to BOTH the MCC
-            (cross-account) and the child you pick here, which can double-count in Google Ads. Pick one or the other.
+          <div className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-900 ring-1 ring-blue-200 dark:bg-blue-500/10 dark:text-blue-200 dark:ring-blue-500/30">
+            <strong>Note:</strong> You have an MCC connection active. Selecting a child account here will <strong>override</strong> the MCC connection for this {scopeType}, ensuring conversions are not double-counted.
           </div>
         )}
 
