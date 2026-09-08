@@ -54,13 +54,13 @@ export function OffersListPage() {
     enabled: !searching,
   });
 
-  // Search pool — one shot fetch of up to SEARCH_POOL_SIZE offers. Cached for
-  // 60s so back-to-back searches don't re-fetch.
-  const poolQuery = useQuery({
-    queryKey: ['offers', 'fuzzy-pool'],
-    queryFn: () => offersApi.list({ limit: SEARCH_POOL_SIZE }),
+  // Search index — lightweight dictionary of all offers (slug + name only).
+  // Cached for 5 mins to keep searches instant.
+  const indexQuery = useQuery({
+    queryKey: ['offers', 'search-index'],
+    queryFn: () => offersApi.searchIndex(),
     enabled: searching,
-    staleTime: 60_000,
+    staleTime: 300_000,
   });
 
   // Fuse handles typos, word-order swaps and matches across hyphenated slugs
@@ -69,8 +69,8 @@ export function OffersListPage() {
   // tokenizer treats hyphens as word boundaries via `useExtendedSearch: false`
   // + `ignoreLocation: true` so partial matches don't penalise position.
   const fuse = useMemo(() => {
-    if (!poolQuery.data) return null;
-    return new Fuse(poolQuery.data.items, {
+    if (!indexQuery.data) return null;
+    return new Fuse(indexQuery.data.items, {
       keys: [
         { name: 'name', weight: 2 },
         { name: 'offer_id', weight: 1 },
@@ -80,19 +80,35 @@ export function OffersListPage() {
       includeScore: false,
       minMatchCharLength: 2,
     });
-  }, [poolQuery.data]);
+  }, [indexQuery.data]);
 
-  const fuzzyResults = useMemo(() => {
-    if (!searching || !fuse) return null;
+  const fuzzyMatchIds = useMemo(() => {
+    if (!searching || !fuse) return [];
     // Replace hyphens/underscores with spaces so "office-depot" and
     // "office depot" score equivalently — without this, Fuse penalises the
     // token-boundary difference on slug-shaped offer_ids.
     const normalised = searchTerm.replace(/[-_]+/g, ' ').trim();
-    return fuse.search(normalised).map((r) => r.item);
+    // Cap to 30 matches for Firestore's 'in' query constraint
+    return fuse.search(normalised).slice(0, 30).map((r) => r.item.offer_id);
   }, [searching, fuse, searchTerm]);
 
-  const query = searching ? poolQuery : pagedQuery;
-  const displayItems = searching ? (fuzzyResults ?? []) : (pagedQuery.data?.items ?? []);
+  // Hydrate full offer details for the search matches.
+  const hydrationQuery = useQuery({
+    queryKey: ['offers', 'hydrated', fuzzyMatchIds],
+    queryFn: () => offersApi.list({ offer_ids: fuzzyMatchIds }),
+    enabled: searching && fuzzyMatchIds.length > 0,
+    staleTime: 60_000,
+  });
+
+  const query = searching ? (fuzzyMatchIds.length > 0 ? hydrationQuery : indexQuery) : pagedQuery;
+  
+  const displayItems = useMemo(() => {
+    if (!searching) return pagedQuery.data?.items ?? [];
+    if (!hydrationQuery.data?.items) return [];
+    // Sort the hydrated results to match the Fuse.js relevance score order
+    const map = new Map(hydrationQuery.data.items.map((o) => [o.offer_id, o]));
+    return fuzzyMatchIds.map((id) => map.get(id)).filter(Boolean) as NonNullable<typeof pagedQuery.data>['items'];
+  }, [searching, pagedQuery.data, hydrationQuery.data, fuzzyMatchIds]);
 
   // Cursor pagination has no total count, so "jump to last" walks forward
   // through nextCursor until the backend stops returning one, accumulating the

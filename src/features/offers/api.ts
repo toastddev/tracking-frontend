@@ -5,6 +5,7 @@ export interface ListParams {
   q?: string;
   cursor?: string | null;
   limit?: number;
+  offer_ids?: string[];
 }
 
 export interface OfferLinkagePayload {
@@ -16,8 +17,11 @@ export interface OfferLinkagePayload {
 export const offersApi = {
   list(params: ListParams = {}) {
     return api<Page<Offer>>('/api/offers', {
-      query: { q: params.q, cursor: params.cursor ?? undefined, limit: params.limit },
+      query: { q: params.q, cursor: params.cursor ?? undefined, limit: params.limit, offer_ids: params.offer_ids?.join(',') },
     });
+  },
+  searchIndex() {
+    return api<{ items: { offer_id: string; name: string }[] }>('/api/offers/search-index');
   },
   get(id: string) {
     return api<Offer>(`/api/offers/${encodeURIComponent(id)}`);
