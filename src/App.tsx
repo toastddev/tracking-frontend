@@ -20,6 +20,8 @@ import { FbCampaignReportsPage } from '@/features/fb-campaigns/FbCampaignReports
 import { FbCampaignDetailPage } from '@/features/fb-campaigns/FbCampaignDetailPage';
 import { FacebookOAuthCallbackPage } from '@/features/connections/facebook/FacebookOAuthCallbackPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { Ga4OAuthCallbackPage } from '@/features/connections/ga4/Ga4OAuthCallbackPage';
+import { Ga4UploadsPage } from '@/features/connections/ga4/Ga4UploadsPage';
 
 export default function App() {
   return (
@@ -49,8 +51,10 @@ export default function App() {
         <Route path="/aff-api" element={<AffApiListPage />} />
         <Route path="/aff-api/:id" element={<AffApiDetailPage />} />
         <Route path="/connections" element={<ConnectionsPage />} />
+        <Route path="/ga4-uploads" element={<Ga4UploadsPage />} />
         <Route path="/oauth/google-ads/callback" element={<GoogleAdsOAuthCallbackPage />} />
         <Route path="/oauth/facebook/callback" element={<FacebookOAuthCallbackPage />} />
+        <Route path="/oauth/ga4/callback" element={<Ga4OAuthCallbackPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
 

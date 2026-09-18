@@ -314,6 +314,9 @@ function RunStatsRow({ run }: { run: AffiliateApiRunRecord }) {
     { k: 'GAds sent', v: run.gads_sent ?? 0 },
     { k: 'GAds skipped', v: run.gads_skipped ?? 0 },
     { k: 'GAds failed', v: run.gads_failed ?? 0 },
+    { k: 'GA4 sent', v: run.ga4_sent ?? 0 },
+    { k: 'GA4 skipped', v: run.ga4_skipped ?? 0 },
+    { k: 'GA4 failed', v: run.ga4_failed ?? 0 },
   ];
   return (
     <>

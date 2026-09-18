@@ -10,6 +10,7 @@ import { GoogleAdsConnectCard } from './GoogleAdsConnectCard';
 import { facebookAdsApi, type FbExchangeResponse } from './facebook/api';
 import { FacebookConnectCard } from './facebook/FacebookConnectCard';
 import { FacebookAccountsModal } from './facebook/FacebookAccountsModal';
+import { Ga4ConnectCard } from './ga4/Ga4ConnectCard';
 
 export function ConnectionsPage() {
   const [params, setParams] = useSearchParams();
@@ -168,6 +169,7 @@ export function ConnectionsPage() {
           ]}
           connections={fbAdAccounts}
         />
+        <Ga4ConnectCard />
       </div>
 
       {fbCallback && (

@@ -968,5 +968,9 @@ export interface AffiliateApiRunRecord {
   gads_skipped?: number;
   gads_failed?: number;
   gads_errors?: string[];
+  ga4_sent?: number;
+  ga4_skipped?: number;
+  ga4_failed?: number;
+  ga4_errors?: string[];
   debug?: AffiliateApiHttpDebug[];
 }

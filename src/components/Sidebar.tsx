@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { BarChart3, LayoutDashboard, Megaphone, Facebook, Package, Webhook, LogOut, Plug, PlugZap, Settings } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { BarChart3, LayoutDashboard, Megaphone, Facebook, Package, Webhook, LogOut, Plug, PlugZap, Settings, LineChart } from 'lucide-react';
+import { ga4Api } from '@/features/connections/ga4/api';
 import { auth } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { ThemeToggle } from './ThemeToggle';
@@ -23,6 +25,20 @@ interface Props {
 
 export function Sidebar({ onClose, headerExtra }: Props) {
   const email = auth.getEmail();
+  // The GA4 Uploads tab exists only while GA4 audit saving is on - with it off
+  // there is nothing stored to audit.
+  const ga4Settings = useQuery({
+    queryKey: ['ga4-settings'],
+    queryFn: () => ga4Api.getSettings(),
+    staleTime: 60_000,
+  });
+  const navItems = ga4Settings.data?.audit_enabled
+    ? [
+        ...items.slice(0, items.length - 1),
+        { to: '/ga4-uploads', label: 'GA4 Uploads', icon: LineChart },
+        items[items.length - 1]!,
+      ]
+    : items;
   return (
     <aside className="flex h-full w-60 flex-col border-r border-slate-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex h-14 items-center justify-between gap-2 border-b border-slate-200 px-5 dark:border-neutral-800">
@@ -34,7 +50,7 @@ export function Sidebar({ onClose, headerExtra }: Props) {
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-        {items.map(({ to, label, icon: Icon }) => (
+        {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
