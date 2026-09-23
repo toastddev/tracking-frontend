@@ -105,13 +105,18 @@ export function OfferReportsTab({ range }: Props) {
     saveSelection(selection);
   }, [selection]);
 
-  // Hydrate the offer list once. We always fetch the full list (capped at 100)
-  // so the multi-select shows everything the admin can pick from, even when
-  // the rollup table doesn't have data yet for a brand-new offer.
+  // Hydrate the offer list once from the search index (slug + name for every
+  // offer) so the multi-select shows everything the admin can pick from, even
+  // when the rollup table doesn't have data yet for a brand-new offer. The
+  // paginated list endpoint only returns the newest N, which hid older offers
+  // from the search box.
   const offersQuery = useQuery({
-    queryKey: ['offers', 'list-for-reports'],
-    queryFn: () => offersApi.list({ limit: 100 }),
-    staleTime: 60_000,
+    queryKey: ['offers', 'search-index'],
+    queryFn: () => offersApi.searchIndex(),
+    staleTime: 300_000,
+    select: (d) => ({
+      items: d.items.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    }),
   });
 
   // Selection semantics:
@@ -184,11 +189,11 @@ export function OfferReportsTab({ range }: Props) {
   }
 
   const filteredOptions = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    // Compare alphanumerics only so "kohls" finds "Kohl's" and "kohls-us".
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const q = norm(search);
     if (!q) return offers;
-    return offers.filter((o) =>
-      o.name.toLowerCase().includes(q) || o.offer_id.toLowerCase().includes(q)
-    );
+    return offers.filter((o) => norm(o.name).includes(q) || norm(o.offer_id).includes(q));
   }, [offers, search]);
 
   function toggleOffer(id: string) {
